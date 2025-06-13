@@ -1,7 +1,7 @@
 import { createBrowserRouter, RouterProvider } from "react-router";
 import RootLayout from "@/app.layout";
 import NotFound from "./NotFound";
-import StarterPage from "./StarterPage";
+import LandingPage from "./LandingPage";
 import AddChannelPage from "./AddChannelPage";
 import RollShortsPage from "./RollShortsPage";
 import DebugPage from "./DebugPage";
@@ -12,7 +12,7 @@ const router = createBrowserRouter([
     element: <RootLayout />,
     // Mounted where the <Outlet /> component is inside the root layout
     children: [
-      { path: "/", element: <StarterPage /> },
+      { path: "/", element: <LandingPage /> },
       { path: "/add-channel", element: <AddChannelPage /> },
        { path: "/roll-shorts", element: <RollShortsPage /> },
        { path: "/debug", element: <DebugPage /> },
