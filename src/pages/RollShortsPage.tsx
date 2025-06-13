@@ -2,6 +2,7 @@
 // src/pages/RollShortsPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/context/toast-context';
+import FloatingNav from '@/components/FloatingNav';
 import { 
   ChannelService, 
   ShortsService, 
@@ -10,6 +11,7 @@ import {
   getTagColor,
   getChannelTypeColor 
 } from '@/lib/supabase';
+import { getChannelShorts } from '@/lib/youtube-api';
 import Button from '@/components/Button';
 import Badge from '@/components/badge';
 import SpinLoader from '@/components/SpinLoader';
@@ -22,25 +24,9 @@ import {
   TrendUp,
   Link as LinkIcon,
   Chart,
-  VideoPlay
+  VideoPlay,
+  Warning2
 } from 'iconsax-react';
-
-// Mock function to generate random YouTube Shorts URL
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const generateRandomShortsUrl = async (channelId: string): Promise<string> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Mock YouTube Shorts URLs
-  const mockShortsIds = [
-    'dQw4w9WgXcQ', 'oHg5SJYRHA0', 'fC7oUOUEEi4', 'L_jWHffIx5E',
-    'kJQP7kiw5Fk', 'ZbZSe6N_BXs', 'Hce74YQHCyY', 'astISOttCQ0',
-    'QB7ACr7pUuE', 'djV11Xbc914', 'w_Ma8oQLmSM', 'FCnGU_PeQRs'
-  ];
-  
-  const randomId = mockShortsIds[Math.floor(Math.random() * mockShortsIds.length)];
-  return `https://youtube.com/shorts/${randomId}`;
-};
 
 interface RolledVideo {
   channelId: string;
@@ -49,7 +35,7 @@ interface RolledVideo {
 }
 
 const RollShortsPage: React.FC = () => {
-  const { success, error, info } = useToast();
+  const { success, error, info, warning } = useToast();
   
   // State management
   const [channels, setChannels] = useState<ChannelWithStats[]>([]);
@@ -79,30 +65,54 @@ const RollShortsPage: React.FC = () => {
       setRollingStates(prev => ({ ...prev, [channel.id]: true }));
       info('Génération en cours...', `Recherche d'un Short pour ${channel.username}`);
 
-      // Generate random shorts URL
-      const videoUrl = await generateRandomShortsUrl(channel.id);
+      // Get channel's available shorts
+      const channelShorts = await getChannelShorts(channel.youtube_url);
       
-      // Check if this video was already rolled
-      const alreadyRolled = await ShortsService.isVideoAlreadyRolled(channel.id, videoUrl);
-      
-      if (alreadyRolled) {
-        // If already rolled and validated, try again
-        info('Vidéo déjà traitée', 'Génération d\'une nouvelle vidéo...');
-        return handleRoll(channel); // Recursive call to get a new video
+      if (!channelShorts || channelShorts.length === 0) {
+        warning('Aucun Short trouvé', 'Cette chaîne ne semble pas avoir de YouTube Shorts disponibles');
+        return;
       }
 
-      // Save the roll to database
-      await ShortsService.createShortsRoll({
-        channel_id: channel.id,
-        video_url: videoUrl,
-      });
+      // Get already rolled videos for this channel to avoid duplicates
+      const existingRolls = await ShortsService.getShortsRolls(channel.id);
+      const validatedUrls = existingRolls
+        .filter(roll => roll.validated)
+        .map(roll => roll.video_url);
+
+      // Filter out already validated videos
+      const availableShorts = channelShorts.filter(
+        shortUrl => !validatedUrls.includes(shortUrl)
+      );
+
+      if (availableShorts.length === 0) {
+        warning('Tous les Shorts traités', 'Tous les Shorts disponibles de cette chaîne ont déjà été validés');
+        return;
+      }
+
+      // Select a random short from available ones
+      const randomIndex = Math.floor(Math.random() * availableShorts.length);
+      const selectedShortUrl = availableShorts[randomIndex];
+
+      // Check if this specific video was already rolled (but not validated)
+      const alreadyRolled = await ShortsService.isVideoAlreadyRolled(channel.id, selectedShortUrl);
+      
+      if (alreadyRolled) {
+        // If already rolled but not validated, just show it again
+        info('Vidéo déjà générée', 'Cette vidéo avait déjà été générée mais pas encore validée');
+      } else {
+        // Save the new roll to database
+        await ShortsService.createShortsRoll({
+          channel_id: channel.id,
+          video_url: selectedShortUrl,
+        });
+      }
 
       // Update local state
       setRolledVideos(prev => ({
         ...prev,
         [channel.id]: {
           channelId: channel.id,
-          videoUrl,
+          videoUrl: selectedShortUrl,
           isValidating: false,
         }
       }));
@@ -110,7 +120,19 @@ const RollShortsPage: React.FC = () => {
       success('Short généré !', 'Cliquez sur "Valider" si ce contenu vous convient');
       
     } catch (err) {
-      error('Erreur de génération', 'Impossible de générer un Short pour cette chaîne');
+      console.error('Error rolling shorts:', err);
+      
+      if (err instanceof Error) {
+        if (err.message.includes('quotaExceeded')) {
+          error('Quota API dépassé', 'Limite YouTube API atteinte. Réessayez plus tard.');
+        } else if (err.message.includes('API key')) {
+          error('Erreur API', 'Clé YouTube API non configurée ou invalide');
+        } else {
+          error('Erreur de génération', err.message || 'Impossible de générer un Short pour cette chaîne');
+        }
+      } else {
+        error('Erreur de génération', 'Impossible de générer un Short pour cette chaîne');
+      }
     } finally {
       setRollingStates(prev => ({ ...prev, [channel.id]: false }));
     }
@@ -167,12 +189,17 @@ const RollShortsPage: React.FC = () => {
   };
 
   const openVideoInNewTab = (url: string) => {
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const navigateToAddChannel = () => {
+    window.location.href = '/add-channel';
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <FloatingNav />
         <div className="text-center">
           <SpinLoader />
           <p className="mt-4 text-gray-600">Chargement des chaînes...</p>
@@ -183,6 +210,8 @@ const RollShortsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <FloatingNav />
+      
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
@@ -195,6 +224,20 @@ const RollShortsPage: React.FC = () => {
           <p className="text-gray-600">
             Générez et validez des YouTube Shorts depuis vos chaînes enregistrées
           </p>
+        </div>
+
+        {/* API Status Warning */}
+        <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <Warning2 color="#F59E0B" size={20} className="text-yellow-600 mt-0.5" />
+            <div>
+              <h3 className="font-medium text-yellow-900 mb-1">Configuration YouTube API</h3>
+              <p className="text-sm text-yellow-800">
+                Assurez-vous que votre clé YouTube API est configurée dans les variables d'environnement 
+                (<code className="bg-yellow-100 px-1 rounded">VITE_YOUTUBE_API_KEY</code>) pour utiliser cette fonctionnalité.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Stats Overview */}
@@ -245,7 +288,7 @@ const RollShortsPage: React.FC = () => {
               Commencez par ajouter des chaînes YouTube pour générer des Shorts
             </p>
             <Button 
-              onClick={() => window.location.href = '/add-channel'}
+              onClick={navigateToAddChannel}
               className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 font-medium transition-colors"
             >
               Ajouter une chaîne
@@ -318,6 +361,7 @@ const RollShortsPage: React.FC = () => {
                         <Button
                           onClick={() => openVideoInNewTab(rolledVideo.videoUrl)}
                           className="text-blue-600 hover:text-blue-800 p-1"
+                          title="Ouvrir dans un nouvel onglet"
                         >
                           <LinkIcon color="#2563EB" size={16} className="text-blue-600" />
                         </Button>
@@ -334,22 +378,23 @@ const RollShortsPage: React.FC = () => {
                       onClick={() => handleRoll(channel)}
                       disabled={isRolling || !!rolledVideo}
                       className={`
-                        flex-1 py-3 px-4 font-medium rounded-lg transition-all
+                        flex-1 py-3 px-4 font-medium rounded-lg transition-all flex items-center justify-center gap-2
                         ${isRolling || rolledVideo 
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                           : 'bg-red-600 hover:bg-red-700 text-white'
                         }
                       `}
+                      title={rolledVideo ? "Validez d'abord le Short actuel" : "Générer un nouveau Short"}
                     >
                       {isRolling ? (
                         <>
                           <SpinLoader />
-                          <span className="ml-2">Génération...</span>
+                          <span>Génération...</span>
                         </>
                       ) : (
                         <>
-                          <Refresh color="currentColor" size={18} />
-                          <span className="ml-2">Roll</span>
+                          <Refresh color="currentColor" size={18} className="flex-shrink-0" />
+                          <span>Roll</span>
                         </>
                       )}
                     </Button>
@@ -358,17 +403,18 @@ const RollShortsPage: React.FC = () => {
                       <Button
                         onClick={() => handleValidate(channel)}
                         disabled={rolledVideo.isValidating}
-                        className="flex-1 py-3 px-4 font-medium rounded-lg bg-green-600 hover:bg-green-700 text-white transition-all"
+                        className="flex-1 py-3 px-4 font-medium rounded-lg bg-green-600 hover:bg-green-700 text-white transition-all flex items-center justify-center gap-2"
+                        title="Valider ce Short"
                       >
                         {rolledVideo.isValidating ? (
                           <>
                             <SpinLoader />
-                            <span className="ml-2">Validation...</span>
+                            <span>Validation...</span>
                           </>
                         ) : (
                           <>
-                            <TickCircle color="currentColor" size={18} />
-                            <span className="ml-2">Valider</span>
+                            <TickCircle color="currentColor" size={18} className="flex-shrink-0" />
+                            <span>Valider</span>
                           </>
                         )}
                       </Button>
@@ -380,6 +426,7 @@ const RollShortsPage: React.FC = () => {
                     <Button
                       onClick={() => openVideoInNewTab(channel.youtube_url)}
                       className="text-sm text-gray-600 hover:text-red-600 transition-colors flex items-center gap-2"
+                      title="Voir la chaîne YouTube"
                     >
                       <LinkIcon color="#6B7280" size={14} className="text-gray-500" />
                       Voir la chaîne
@@ -395,7 +442,7 @@ const RollShortsPage: React.FC = () => {
         {channels.length > 0 && (
           <div className="mt-8 text-center">
             <Button
-              onClick={() => window.location.href = '/add-channel'}
+              onClick={navigateToAddChannel}
               className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 font-medium rounded-lg transition-colors"
             >
               Ajouter une nouvelle chaîne
