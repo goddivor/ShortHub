@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/supabase.ts
 import { createClient } from "@supabase/supabase-js";
 
@@ -98,34 +97,53 @@ export class ChannelService {
   }
 
   static async getChannelsWithStats(): Promise<ChannelWithStats[]> {
-    const { data, error } = await supabase
+    // Get channels first
+    const { data: channels, error: channelsError } = await supabase
       .from("channels")
-      .select(
-        `
-        *,
-        shorts_rolls(count),
-        shorts_rolls_validated:shorts_rolls(count,validated),
-        shorts_rolls_pending:shorts_rolls(count,validated)
-      `,
-        { count: "exact" }
-      )
+      .select("*")
       .order("created_at", { ascending: false });
 
-    if (error) throw error;
+    if (channelsError) throw channelsError;
 
-    // Map the response to match ChannelWithStats interface
-    return (data || []).map((channel: any) => ({
-      ...channel,
-      total_rolls: channel.shorts_rolls?.[0]?.count ?? 0,
-      validated_rolls:
-        channel.shorts_rolls_validated?.filter(
-          (r: any) => r.validated === true
-        )[0]?.count ?? 0,
-      pending_rolls:
-        channel.shorts_rolls_pending?.filter(
-          (r: any) => r.validated === false
-        )[0]?.count ?? 0,
-    }));
+    // Get stats for each channel
+    const channelsWithStats: ChannelWithStats[] = [];
+
+    for (const channel of channels || []) {
+      // Get total rolls count
+      const { count: totalCount, error: totalError } = await supabase
+        .from("shorts_rolls")
+        .select("*", { count: "exact", head: true })
+        .eq("channel_id", channel.id);
+
+      if (totalError) throw totalError;
+
+      // Get validated rolls count
+      const { count: validatedCount, error: validatedError } = await supabase
+        .from("shorts_rolls")
+        .select("*", { count: "exact", head: true })
+        .eq("channel_id", channel.id)
+        .eq("validated", true);
+
+      if (validatedError) throw validatedError;
+
+      // Get pending rolls count
+      const { count: pendingCount, error: pendingError } = await supabase
+        .from("shorts_rolls")
+        .select("*", { count: "exact", head: true })
+        .eq("channel_id", channel.id)
+        .eq("validated", false);
+
+      if (pendingError) throw pendingError;
+
+      channelsWithStats.push({
+        ...channel,
+        total_rolls: totalCount || 0,
+        validated_rolls: validatedCount || 0,
+        pending_rolls: pendingCount || 0,
+      });
+    }
+
+    return channelsWithStats;
   }
 
   static async updateChannel(
