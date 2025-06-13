@@ -11,7 +11,7 @@ if (!supabaseUrl || !supabaseKey) {
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Database Types
-export type TagType = "VF" | "VOSTFR" | "VA" | "VOSTA";
+export type TagType = "VF" | "VOSTFR" | "VA" | "VOSTA" | "VO";
 export type ChannelType = "Mix" | "Only";
 
 export interface Channel {
@@ -278,12 +278,26 @@ export const getChannelTypeColor = (type: ChannelType): string => {
     : "bg-green-100 text-green-800";
 };
 
+export const getTypeOptions = () => [
+  { value: "Mix", label: "Mix" },
+  { value: "Only", label: "Only" },
+];
+
+export const getTagOptions = () => [
+  { value: "VF", label: "VF" },
+  { value: "VOSTFR", label: "VOSTFR" },
+  { value: "VA", label: "VA" },
+  { value: "VOSTA", label: "VOSTA" },
+  { value: "VO", label: "VO" },
+];
+
 export const getTagColor = (tag: TagType): string => {
   const colors = {
     VF: "bg-red-100 text-red-800",
     VOSTFR: "bg-blue-100 text-blue-800",
     VA: "bg-yellow-100 text-yellow-800",
     VOSTA: "bg-purple-100 text-purple-800",
+    VO: "bg-green-100 text-green-800",
   };
   return colors[tag];
 };
