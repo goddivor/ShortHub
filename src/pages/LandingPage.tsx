@@ -68,7 +68,7 @@ const LandingPage: React.FC = () => {
                 Statistiques
               </a>
               <Button
-                onClick={() => navigate('/add-channel')}
+                onClick={() => navigate('/dashboard')}
                 className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
               >
                 Commencer

@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // src/pages/RollShortsPage.tsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { useToast } from '@/context/toast-context';
-import FloatingNav from '@/components/FloatingNav';
 import { 
   ChannelService, 
   ShortsService, 
@@ -25,7 +25,12 @@ import {
   Link as LinkIcon,
   Chart,
   VideoPlay,
-  CloseCircle
+  CloseCircle,
+  Timer,
+  Add,
+  Filter,
+  ArrowUp2,
+  ArrowDown2
 } from 'iconsax-react';
 
 interface RolledVideo {
@@ -37,6 +42,7 @@ interface RolledVideo {
 }
 
 const RollShortsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { success, error, info, warning } = useToast();
   
   // State management
@@ -251,12 +257,17 @@ const RollShortsPage: React.FC = () => {
   };
 
   const navigateToAddChannel = () => {
-    window.location.href = '/add-channel';
+    navigate('/dashboard/add-channel');
   };
+
+  // Calculate total stats
+  const totalValidated = channels.reduce((sum, ch) => sum + ch.validated_rolls, 0);
+  const totalPending = channels.reduce((sum, ch) => sum + ch.pending_rolls, 0);
+  const totalSubscribers = channels.reduce((sum, ch) => sum + ch.subscriber_count, 0);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="p-6 flex items-center justify-center min-h-96">
         <div className="text-center">
           <SpinLoader />
           <p className="mt-4 text-gray-600">Chargement des chaînes...</p>
@@ -266,161 +277,203 @@ const RollShortsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <VideoPlay color="#FF0000" size={48} className="text-red-600" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
             Générateur de Shorts
           </h1>
           <p className="text-gray-600">
             Générez et validez des YouTube Shorts depuis vos chaînes enregistrées
           </p>
         </div>
+        
+        <Button
+          onClick={navigateToAddChannel}
+          className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 font-medium rounded-lg transition-colors flex items-center gap-2 lg:flex-shrink-0"
+        >
+          <Add color="white" size={20} className="text-white" />
+          Ajouter une chaîne
+        </Button>
+      </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg p-6 shadow-sm border">
-            <div className="flex items-center gap-3">
-              <Youtube color="#FF0000" size={24} className="text-red-600" />
-              <div>
-                <p className="text-sm text-gray-600">Chaînes enregistrées</p>
-                <p className="text-2xl font-bold text-gray-900">{channels.length}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-6 shadow-sm border">
-            <div className="flex items-center gap-3">
-              <Play color="#10B981" size={24} className="text-green-600" />
-              <div>
-                <p className="text-sm text-gray-600">Shorts validés</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {channels.reduce((sum, ch) => sum + ch.validated_rolls, 0)}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-6 shadow-sm border">
-            <div className="flex items-center gap-3">
-              <Chart color="#F59E0B" size={24} className="text-yellow-600" />
-              <div>
-                <p className="text-sm text-gray-600">En attente</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {channels.reduce((sum, ch) => sum + ch.pending_rolls, 0)}
-                </p>
-              </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg p-4 border border-gray-200">
+          <div className="flex items-center gap-3">
+            <Youtube color="#FF0000" size={24} className="text-red-600" />
+            <div>
+              <p className="text-sm text-gray-600">Chaînes enregistrées</p>
+              <p className="text-xl font-bold text-gray-900">{channels.length}</p>
             </div>
           </div>
         </div>
-
-        {/* Channels List */}
-        {channels.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-            <Youtube color="#9CA3AF" size={64} className="text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              Aucune chaîne enregistrée
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Commencez par ajouter des chaînes YouTube pour générer des Shorts
-            </p>
-            <Button 
-              onClick={navigateToAddChannel}
-              className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 font-medium transition-colors"
-            >
-              Ajouter une chaîne
-            </Button>
+        
+        <div className="bg-white rounded-lg p-4 border border-gray-200">
+          <div className="flex items-center gap-3">
+            <TickCircle color="#10B981" size={24} className="text-green-600" />
+            <div>
+              <p className="text-sm text-gray-600">Shorts validés</p>
+              <p className="text-xl font-bold text-gray-900">{totalValidated}</p>
+            </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {channels.map((channel) => {
-              const isRolling = rollingStates[channel.id];
-              const channelRolledVideos = rolledVideos[channel.id] || [];
-              
-              return (
-                <div key={channel.id} className="bg-white rounded-xl shadow-sm border p-6">
-                  {/* Channel Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-red-100 rounded-full p-2">
-                        <User color="#FF0000" size={20} className="text-red-600" />
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 border border-gray-200">
+          <div className="flex items-center gap-3">
+            <Timer color="#F59E0B" size={24} className="text-yellow-600" />
+            <div>
+              <p className="text-sm text-gray-600">En attente</p>
+              <p className="text-xl font-bold text-gray-900">{totalPending}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 border border-gray-200">
+          <div className="flex items-center gap-3">
+            <TrendUp color="#8B5CF6" size={24} className="text-purple-600" />
+            <div>
+              <p className="text-sm text-gray-600">Abonnés cumulés</p>
+              <p className="text-xl font-bold text-gray-900">{formatSubscriberCount(totalSubscribers)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Results Info */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          {channels.length} chaîne{channels.length > 1 ? 's' : ''} disponible{channels.length > 1 ? 's' : ''} pour la génération
+        </p>
+        
+        <Button
+          onClick={loadChannels}
+          className="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+          title="Actualiser"
+        >
+          <Refresh color="#6B7280" size={16} className="text-gray-500" />
+        </Button>
+      </div>
+
+      {/* Channels Grid */}
+      {channels.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <VideoPlay color="#9CA3AF" size={64} className="text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            Aucune chaîne disponible
+          </h3>
+          <p className="text-gray-600 mb-6">
+            Commencez par ajouter des chaînes YouTube pour générer des Shorts
+          </p>
+          <Button
+            onClick={navigateToAddChannel}
+            className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 font-medium rounded-lg transition-colors flex items-center gap-2 mx-auto"
+          >
+            <Add color="white" size={20} className="text-white" />
+            Ajouter votre première chaîne
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {channels.map((channel) => {
+            const isRolling = rollingStates[channel.id];
+            const channelRolledVideos = rolledVideos[channel.id] || [];
+            
+            return (
+              <div key={channel.id} className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+                {/* Channel Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="bg-red-100 rounded-full p-2 flex-shrink-0">
+                      <User color="#FF0000" size={20} className="text-red-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-gray-900 truncate" title={channel.username}>
+                        {channel.username}
+                      </h3>
+                      <div className="flex items-center gap-1 text-sm text-gray-600">
+                        <TrendUp color="#6B7280" size={14} className="text-gray-500" />
+                        <span>{formatSubscriberCount(channel.subscriber_count)} abonnés</span>
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{channel.username}</h3>
-                        <div className="flex items-center gap-1 text-sm text-gray-600">
-                          <TrendUp color="#6B7280" size={14} className="text-gray-500" />
-                          {formatSubscriberCount(channel.subscriber_count)}
-                        </div>
-                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Channel Link */}
+                  <Button
+                    onClick={() => openVideoInNewTab(channel.youtube_url)}
+                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0"
+                    title="Voir la chaîne YouTube"
+                  >
+                    <LinkIcon color="#6B7280" size={16} className="text-gray-500" />
+                  </Button>
+                </div>
+
+                {/* Channel Tags */}
+                <div className="flex items-center gap-2 mb-4">
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getTagColor(channel.tag)}`}>
+                    {channel.tag}
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getChannelTypeColor(channel.type)}`}>
+                    {channel.type}
+                  </span>
+                  {channel.domain && (
+                    <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+                      {channel.domain}
+                    </span>
+                  )}
+                </div>
+
+                {/* Channel Stats */}
+                <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">Total</p>
+                    <p className="font-semibold text-gray-900">{channel.total_rolls}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">Validés</p>
+                    <p className="font-semibold text-green-600">{channel.validated_rolls}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">En attente</p>
+                    <p className="font-semibold text-yellow-600">{channel.pending_rolls}</p>
+                  </div>
+                </div>
+
+                {/* Rolled Videos Display */}
+                {channelRolledVideos.length > 0 && (
+                  <div className="mb-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-gray-900">Shorts générés</h4>
+                      <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+                        {channelRolledVideos.length}
+                      </span>
                     </div>
                     
-                    {/* Channel Badges */}
-                    <div className="flex gap-2">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getTagColor(channel.tag)}`}>
-                        {channel.tag}
-                      </span>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getChannelTypeColor(channel.type)}`}>
-                        {channel.type}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Channel Stats */}
-                  <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
-                    <div className="text-center">
-                      <p className="text-sm text-gray-600">Total</p>
-                      <p className="font-semibold text-gray-900">{channel.total_rolls}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm text-gray-600">Validés</p>
-                      <p className="font-semibold text-green-600">{channel.validated_rolls}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm text-gray-600">En attente</p>
-                      <p className="font-semibold text-yellow-600">{channel.pending_rolls}</p>
-                    </div>
-                  </div>
-
-                  {/* Domain Badge (if type = Only) */}
-                  {channel.domain && (
-                    <div className="mb-4">
-                      <Badge className="bg-purple-100 text-purple-800">
-                        {channel.domain}
-                      </Badge>
-                    </div>
-                  )}
-
-                  {/* Rolled Videos Display */}
-                  {channelRolledVideos.length > 0 && (
-                    <div className="mb-4 space-y-3">
-                      <h4 className="font-medium text-gray-900">Shorts générés ({channelRolledVideos.length}):</h4>
+                    <div className="space-y-2">
                       {channelRolledVideos.map((rolledVideo) => (
-                        <div key={rolledVideo.id} className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="font-medium text-blue-900">Short:</span>
+                        <div key={rolledVideo.id} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-blue-900">YouTube Short</span>
                             <Button
                               onClick={() => openVideoInNewTab(rolledVideo.videoUrl)}
                               className="text-blue-600 hover:text-blue-800 p-1"
                               title="Ouvrir dans un nouvel onglet"
                             >
-                              <LinkIcon color="#2563EB" size={16} className="text-blue-600" />
+                              <LinkIcon color="#2563EB" size={12} className="text-blue-600" />
                             </Button>
                           </div>
-                          <div className="text-sm text-blue-800 bg-blue-100 p-2 rounded font-mono break-all mb-3">
+                          
+                          <div className="text-xs text-blue-800 bg-blue-100 p-2 rounded font-mono break-all mb-3">
                             {rolledVideo.videoUrl}
                           </div>
                           
-                          {/* Action buttons for each video */}
+                          {/* Action buttons */}
                           <div className="flex gap-2">
                             <Button
                               onClick={() => handleValidate(channel, rolledVideo)}
                               disabled={rolledVideo.isValidating}
-                              className="flex-1 py-2 px-3 text-sm font-medium rounded bg-green-600 hover:bg-green-700 text-white transition-all flex items-center justify-center gap-2"
-                              title="Valider ce Short"
+                              className="flex-1 py-2 px-3 text-xs font-medium rounded-lg bg-green-600 hover:bg-green-700 text-white transition-all flex items-center justify-center gap-1"
                             >
                               {rolledVideo.isValidating ? (
                                 <>
@@ -429,7 +482,7 @@ const RollShortsPage: React.FC = () => {
                                 </>
                               ) : (
                                 <>
-                                  <TickCircle color="currentColor" size={16} className="flex-shrink-0" />
+                                  <TickCircle color="currentColor" size={12} className="flex-shrink-0" />
                                   <span>Valider</span>
                                 </>
                               )}
@@ -438,8 +491,7 @@ const RollShortsPage: React.FC = () => {
                             <Button
                               onClick={() => handleIgnore(channel, rolledVideo)}
                               disabled={rolledVideo.isValidating}
-                              className="flex-1 py-2 px-3 text-sm font-medium rounded bg-gray-600 hover:bg-gray-700 text-white transition-all flex items-center justify-center gap-2"
-                              title="Ignorer ce Short"
+                              className="flex-1 py-2 px-3 text-xs font-medium rounded-lg bg-gray-600 hover:bg-gray-700 text-white transition-all flex items-center justify-center gap-1"
                             >
                               {rolledVideo.isValidating ? (
                                 <>
@@ -448,7 +500,7 @@ const RollShortsPage: React.FC = () => {
                                 </>
                               ) : (
                                 <>
-                                  <CloseCircle color="currentColor" size={16} className="flex-shrink-0" />
+                                  <CloseCircle color="currentColor" size={12} className="flex-shrink-0" />
                                   <span>Ignorer</span>
                                 </>
                               )}
@@ -457,53 +509,84 @@ const RollShortsPage: React.FC = () => {
                         </div>
                       ))}
                     </div>
-                  )}
-
-                  {/* Roll Button */}
-                  <div className="mb-4">
-                    <Button
-                      onClick={() => handleRoll(channel)}
-                      disabled={isRolling}
-                      className={`
-                        w-full py-3 px-4 font-medium rounded-lg transition-all flex items-center justify-center gap-2
-                        ${isRolling 
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                          : 'bg-red-600 hover:bg-red-700 text-white'
-                        }
-                      `}
-                      title="Générer un nouveau Short"
-                    >
-                      {isRolling ? (
-                        <>
-                          <SpinLoader />
-                          <span>Génération...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Refresh color="currentColor" size={18} className="flex-shrink-0" />
-                          <span>Générer un Short</span>
-                        </>
-                      )}
-                    </Button>
                   </div>
+                )}
 
-                  {/* Channel URL Link */}
-                  <div className="pt-4 border-t">
-                    <Button
-                      onClick={() => openVideoInNewTab(channel.youtube_url)}
-                      className="text-sm text-gray-600 hover:text-red-600 transition-colors flex items-center gap-2"
-                      title="Voir la chaîne YouTube"
-                    >
-                      <LinkIcon color="#6B7280" size={14} className="text-gray-500" />
-                      Voir la chaîne
-                    </Button>
-                  </div>
+                {/* Roll Button */}
+                <div className="pt-4 border-t border-gray-200">
+                  <Button
+                    onClick={() => handleRoll(channel)}
+                    disabled={isRolling}
+                    className={`
+                      w-full py-3 px-4 font-medium rounded-lg transition-all flex items-center justify-center gap-2
+                      ${isRolling 
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                        : 'bg-red-600 hover:bg-red-700 text-white'
+                      }
+                    `}
+                  >
+                    {isRolling ? (
+                      <>
+                        <SpinLoader />
+                        <span>Génération...</span>
+                      </>
+                    ) : (
+                      <>
+                        <VideoPlay color="currentColor" size={18} className="flex-shrink-0" />
+                        <span>Générer un Short</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Performance Summary (only show if there are channels) */}
+      {channels.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Globale</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Validation Rate */}
+            <div className="text-center">
+              <div className="mb-2">
+                <span className="text-2xl font-bold text-green-600">
+                  {totalValidated + totalPending > 0 
+                    ? Math.round((totalValidated / (totalValidated + totalPending)) * 100)
+                    : 0
+                  }%
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">Taux de validation</p>
+            </div>
+            
+            {/* Active Channels */}
+            <div className="text-center">
+              <div className="mb-2">
+                <span className="text-2xl font-bold text-blue-600">
+                  {channels.filter(ch => ch.total_rolls > 0).length}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">Chaînes actives</p>
+            </div>
+            
+            {/* Average per Channel */}
+            <div className="text-center">
+              <div className="mb-2">
+                <span className="text-2xl font-bold text-purple-600">
+                  {channels.length > 0 
+                    ? Math.round((totalValidated + totalPending) / channels.length)
+                    : 0
+                  }
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">Moyenne par chaîne</p>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
