@@ -1,26 +1,23 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 // src/pages/AddChannelPage.tsx
 import React, { useState, useEffect } from 'react';
-import { Input } from '@/components/forms/Input';
-import { CustomSelect } from '@/components/forms/custom-select';
 import Button from '@/components/Button';
-import FloatingNav from '@/components/FloatingNav';
-import { useToast } from '@/context/toast-context';
+import { SearchInput } from '@/components/forms/search-input';
+import { CustomSelect } from '@/components/forms/custom-select';
+import SpinLoader from '@/components/SpinLoader';
+import { ChannelModal } from '@/components/modal/ChannelModal';
+import { DeleteModal } from '@/components/modal/DeleteModal';
 import { 
   ChannelService, 
-  type CreateChannelInput, 
-  type TagType, 
-  type ChannelType,
   type Channel,
-  getTagOptions,
-  getTypeOptions,
+  type TagType,
   formatSubscriberCount,
   getTagColor,
-  getChannelTypeColor
+  getChannelTypeColor,
+  getTagOptions,
+  getTypeOptions
 } from '@/lib/supabase';
-import { extractChannelData } from '@/lib/youtube-api';
 import { 
   Youtube, 
   User, 
@@ -28,31 +25,54 @@ import {
   Add, 
   Trash, 
   Edit, 
-  Save2, 
+  Link as LinkIcon,
+  SearchNormal1,
+  Filter,
   CloseCircle,
-  Link as LinkIcon
+  ArrowUp2,
+  ArrowDown2
 } from 'iconsax-react';
-import SpinLoader from '@/components/SpinLoader';
 
-interface EditingChannel extends Partial<CreateChannelInput> {
-  id?: string;
-  isNew?: boolean;
-  isExtracting?: boolean;
-  isSaving?: boolean;
+type SortField = 'username' | 'subscriber_count' | 'created_at' | 'tag' | 'type';
+type SortDirection = 'asc' | 'desc';
+
+interface FilterState {
+  tag: string | null;
+  type: string | null;
+  search: string;
 }
 
 const AddChannelPage: React.FC = () => {
-  const { success, error, info } = useToast();
-  
   // State
   const [channels, setChannels] = useState<Channel[]>([]);
-  const [editingChannels, setEditingChannels] = useState<Record<string, EditingChannel>>({});
+  const [filteredChannels, setFilteredChannels] = useState<Channel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Modal states
+  const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
+  const [deletingChannel, setDeletingChannel] = useState<Channel | null>(null);
+  
+  // Filter and sort states
+  const [filters, setFilters] = useState<FilterState>({
+    tag: null,
+    type: null,
+    search: ''
+  });
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Load channels on mount
   useEffect(() => {
     loadChannels();
   }, []);
+
+  // Apply filters and sorting when data or filters change
+  useEffect(() => {
+    applyFiltersAndSort();
+  }, [channels, filters, sortField, sortDirection]);
 
   const loadChannels = async () => {
     try {
@@ -60,323 +80,123 @@ const AddChannelPage: React.FC = () => {
       const channelsData = await ChannelService.getChannels();
       setChannels(channelsData);
     } catch (err) {
-      error('Erreur de chargement', 'Impossible de charger les chaînes');
+      console.error('Error loading channels:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Add new row
-  const addNewChannel = () => {
-    const newId = `new-${Date.now()}`;
-    setEditingChannels(prev => ({
-      ...prev,
-      [newId]: {
-        id: newId,
-        isNew: true,
-        youtube_url: '',
-        username: '',
-        subscriber_count: 0,
-        tag: undefined,
-        type: undefined,
-        domain: '',
+  const applyFiltersAndSort = () => {
+    let filtered = [...channels];
+
+    // Apply search filter
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      filtered = filtered.filter(channel => 
+        channel.username.toLowerCase().includes(searchTerm) ||
+        channel.youtube_url.toLowerCase().includes(searchTerm) ||
+        (channel.domain && channel.domain.toLowerCase().includes(searchTerm))
+      );
+    }
+
+    // Apply tag filter
+    if (filters.tag) {
+      filtered = filtered.filter(channel => channel.tag === filters.tag);
+    }
+
+    // Apply type filter
+    if (filters.type) {
+      filtered = filtered.filter(channel => channel.type === filters.type);
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue: any = a[sortField];
+      let bValue: any = b[sortField];
+
+      // Handle different data types
+      if (sortField === 'subscriber_count') {
+        aValue = Number(aValue) || 0;
+        bValue = Number(bValue) || 0;
+      } else if (sortField === 'created_at') {
+        aValue = new Date(aValue).getTime();
+        bValue = new Date(bValue).getTime();
+      } else {
+        aValue = String(aValue).toLowerCase();
+        bValue = String(bValue).toLowerCase();
       }
-    }));
+
+      if (sortDirection === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+    });
+
+    setFilteredChannels(filtered);
   };
 
-  // Start editing existing channel
-  const startEditing = (channel: Channel) => {
-    setEditingChannels(prev => ({
-      ...prev,
-      [channel.id]: {
-        id: channel.id,
-        isNew: false,
-        youtube_url: channel.youtube_url,
-        username: channel.username,
-        subscriber_count: channel.subscriber_count,
-        tag: channel.tag,
-        type: channel.type,
-        domain: channel.domain || '',
-      }
-    }));
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
   };
 
-  // Cancel editing
-  const cancelEditing = (id: string) => {
-    setEditingChannels(prev => {
-      const newState = { ...prev };
-      delete newState[id];
-      return newState;
+  const clearFilters = () => {
+    setFilters({
+      tag: null,
+      type: null,
+      search: ''
     });
   };
 
-  // Update editing channel data
-  const updateEditingChannel = (id: string, updates: Partial<EditingChannel>) => {
-    setEditingChannels(prev => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        ...updates
-      }
-    }));
+  const openAddModal = () => {
+    setEditingChannel(null);
+    setIsChannelModalOpen(true);
   };
 
-  // Extract channel data from YouTube URL
-  const handleUrlExtraction = async (id: string, url: string) => {
-    if (!url || url.length < 10) return;
+  const openEditModal = (channel: Channel) => {
+    setEditingChannel(channel);
+    setIsChannelModalOpen(true);
+  };
 
-    updateEditingChannel(id, { isExtracting: true });
+  const openDeleteModal = (channel: Channel) => {
+    setDeletingChannel(channel);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleModalSave = () => {
+    loadChannels();
+  };
+
+  const handleDeleteComplete = () => {
+    loadChannels();
+  };
+
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) return null;
     
-    try {
-      info('Extraction des données...', 'Récupération des informations de la chaîne');
-      
-      const data = await extractChannelData(url);
-      
-      updateEditingChannel(id, {
-        username: data.username,
-        subscriber_count: data.subscriber_count,
-        isExtracting: false
-      });
-      
-      success('Données extraites !', `${data.username} • ${formatSubscriberCount(data.subscriber_count)} abonnés`);
-    } catch (err) {
-      updateEditingChannel(id, { isExtracting: false });
-      error('Erreur d\'extraction', err instanceof Error ? err.message : 'Impossible de récupérer les données');
-    }
-  };
-
-  // Save channel
-  const saveChannel = async (id: string) => {
-    const editingChannel = editingChannels[id];
-    if (!editingChannel) return;
-
-    // Validation
-    if (!editingChannel.youtube_url || !editingChannel.username || !editingChannel.tag || !editingChannel.type) {
-      error('Données incomplètes', 'Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-
-    if (editingChannel.type === 'Only' && !editingChannel.domain) {
-      error('Domaine requis', 'Veuillez spécifier un domaine pour le type "Only"');
-      return;
-    }
-
-    updateEditingChannel(id, { isSaving: true });
-
-    try {
-      const channelData: CreateChannelInput = {
-        youtube_url: editingChannel.youtube_url!,
-        username: editingChannel.username!,
-        subscriber_count: editingChannel.subscriber_count || 0,
-        tag: editingChannel.tag!,
-        type: editingChannel.type!,
-        domain: editingChannel.domain || undefined,
-      };
-
-      if (editingChannel.isNew) {
-        await ChannelService.createChannel(channelData);
-        success('Chaîne ajoutée !', 'La nouvelle chaîne a été enregistrée');
-      } else {
-        await ChannelService.updateChannel(editingChannel.id!, channelData);
-        success('Chaîne mise à jour !', 'Les modifications ont été sauvegardées');
-      }
-
-      // Remove from editing state and reload
-      cancelEditing(id);
-      loadChannels();
-      
-    } catch (err) {
-      error('Erreur de sauvegarde', 'Impossible d\'enregistrer la chaîne');
-    } finally {
-      updateEditingChannel(id, { isSaving: false });
-    }
-  };
-
-  // Delete channel
-  const deleteChannel = async (channel: Channel) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer la chaîne "${channel.username}" ?`)) {
-      return;
-    }
-
-    try {
-      await ChannelService.deleteChannel(channel.id);
-      success('Chaîne supprimée', 'La chaîne a été supprimée avec succès');
-      loadChannels();
-    } catch (err) {
-      error('Erreur de suppression', 'Impossible de supprimer la chaîne');
-    }
-  };
-
-  // Render table row for existing channel
-  const renderChannelRow = (channel: Channel) => {
-    const isEditing = editingChannels[channel.id];
-
-    if (isEditing) {
-      return renderEditingRow(channel.id, isEditing);
-    }
-
-    return (
-      <tr key={channel.id} className="hover:bg-gray-50">
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Youtube color="#FF0000" size={16} className="text-red-600" />
-            <a 
-              href={channel.youtube_url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 text-sm"
-            >
-              <LinkIcon color="#2563EB" size={14} className="text-blue-600" />
-            </a>
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-2">
-            <User color="#6B7280" size={16} className="text-gray-500" />
-            <span className="font-medium text-gray-900">{channel.username}</span>
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-1 text-sm text-gray-600">
-            <TrendUp color="#6B7280" size={14} className="text-gray-500" />
-            {formatSubscriberCount(channel.subscriber_count)}
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <span className={`px-2 py-1 rounded text-xs font-medium ${getTagColor(channel.tag)}`}>
-            {channel.tag}
-          </span>
-        </td>
-        <td className="px-6 py-4">
-          <span className={`px-2 py-1 rounded text-xs font-medium ${getChannelTypeColor(channel.type)}`}>
-            {channel.type}
-          </span>
-        </td>
-        <td className="px-6 py-4">
-          <span className="text-sm text-gray-600">
-            {channel.domain || '-'}
-          </span>
-        </td>
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => startEditing(channel)}
-              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              title="Modifier"
-            >
-              <Edit color="#2563EB" size={16} className="text-blue-600" />
-            </Button>
-            <Button
-              onClick={() => deleteChannel(channel)}
-              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="Supprimer"
-            >
-              <Trash color="#EF4444" size={16} className="text-red-600" />
-            </Button>
-          </div>
-        </td>
-      </tr>
+    return sortDirection === 'asc' ? (
+      <ArrowUp2 color="#6B7280" size={14} className="text-gray-500" />
+    ) : (
+      <ArrowDown2 color="#6B7280" size={14} className="text-gray-500" />
     );
   };
 
-  // Render editing row
-  const renderEditingRow = (id: string, editingChannel: EditingChannel) => {
-    return (
-      <tr key={id} className="bg-blue-50 border border-blue-200">
-        <td className="px-6 py-4">
-          <Input
-            placeholder="https://youtube.com/@channel"
-            value={editingChannel.youtube_url || ''}
-            onChange={(e) => {
-              updateEditingChannel(id, { youtube_url: e.target.value });
-              // Auto-extract on URL change with debounce
-              clearTimeout((window as any)[`extract-${id}`]);
-              (window as any)[`extract-${id}`] = setTimeout(() => {
-                handleUrlExtraction(id, e.target.value);
-              }, 1000);
-            }}
-            className="text-sm"
-          />
-        </td>
-        <td className="px-6 py-4">
-          <div className="relative">
-            <Input
-              placeholder="@username"
-              value={editingChannel.username || ''}
-              onChange={(e) => updateEditingChannel(id, { username: e.target.value })}
-              disabled={editingChannel.isExtracting}
-              className="text-sm"
-            />
-            {editingChannel.isExtracting && (
-              <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                <SpinLoader />
-              </div>
-            )}
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <span className="text-sm text-gray-600">
-            {editingChannel.subscriber_count ? formatSubscriberCount(editingChannel.subscriber_count) : '-'}
-          </span>
-        </td>
-        <td className="px-6 py-4">
-          <CustomSelect
-            options={getTagOptions()}
-            value={editingChannel.tag || null}
-            onChange={(value) => updateEditingChannel(id, { tag: value as TagType })}
-            placeholder="Tag"
-          />
-        </td>
-        <td className="px-6 py-4">
-          <CustomSelect
-            options={getTypeOptions()}
-            value={editingChannel.type || null}
-            onChange={(value) => updateEditingChannel(id, { type: value as ChannelType })}
-            placeholder="Type"
-          />
-        </td>
-        <td className="px-6 py-4">
-          {editingChannel.type === 'Only' ? (
-            <Input
-              placeholder="Gaming, Tech, Music..."
-              value={editingChannel.domain || ''}
-              onChange={(e) => updateEditingChannel(id, { domain: e.target.value })}
-              className="text-sm"
-            />
-          ) : (
-            <span className="text-sm text-gray-400">-</span>
-          )}
-        </td>
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => saveChannel(id)}
-              disabled={editingChannel.isSaving || editingChannel.isExtracting}
-              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-              title="Sauvegarder"
-            >
-              {editingChannel.isSaving ? (
-                <SpinLoader />
-              ) : (
-                <Save2 color="#10B981" size={16} className="text-green-600" />
-              )}
-            </Button>
-            <Button
-              onClick={() => cancelEditing(id)}
-              className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-              title="Annuler"
-            >
-              <CloseCircle color="#6B7280" size={16} className="text-gray-600" />
-            </Button>
-          </div>
-        </td>
-      </tr>
-    );
+  const getSortButtonClass = (field: SortField) => {
+    return `flex items-center gap-1 text-sm font-medium transition-colors ${
+      sortField === field 
+        ? 'text-red-600' 
+        : 'text-gray-600 hover:text-gray-900'
+    }`;
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="p-6 flex items-center justify-center min-h-96">
         <div className="text-center">
           <SpinLoader />
           <p className="mt-4 text-gray-600">Chargement des chaînes...</p>
@@ -386,173 +206,382 @@ const AddChannelPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Gestion des Chaînes
-            </h1>
-            <p className="text-gray-600">
-              Ajoutez et gérez vos chaînes YouTube pour le traitement des Shorts
-            </p>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Gestion des Chaînes
+          </h1>
+          <p className="text-gray-600">
+            Ajoutez et gérez vos chaînes YouTube pour le traitement des Shorts
+          </p>
+        </div>
+        
+        <Button
+          onClick={openAddModal}
+          className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 font-medium rounded-lg transition-colors flex items-center gap-2 lg:flex-shrink-0"
+        >
+          <Add color="white" size={20} className="text-white" />
+          Ajouter une chaîne
+        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      {channels.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center gap-3">
+              <Youtube color="#FF0000" size={24} className="text-red-600" />
+              <div>
+                <p className="text-sm text-gray-600">Chaînes totales</p>
+                <p className="text-xl font-bold text-gray-900">{channels.length}</p>
+              </div>
+            </div>
           </div>
           
-          <Button
-            onClick={addNewChannel}
-            className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 font-medium rounded-lg transition-colors flex items-center gap-2"
-          >
-            <Add color="white" size={20} className="text-white" />
-            Ajouter une chaîne
-          </Button>
-        </div>
-
-        {/* Table */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    URL
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Username
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Abonnés
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tag
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Domaine
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {/* Existing channels */}
-                {channels.map(renderChannelRow)}
-                
-                {/* New editing rows */}
-                {Object.entries(editingChannels)
-                  .filter(([_, channel]) => channel.isNew)
-                  .map(([id, channel]) => renderEditingRow(id, channel))
-                }
-                
-                {/* Empty state */}
-                {channels.length === 0 && Object.keys(editingChannels).length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center">
-                      <div className="flex flex-col items-center">
-                        <Youtube color="#9CA3AF" size={48} className="text-gray-400 mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                          Aucune chaîne enregistrée
-                        </h3>
-                        <p className="text-gray-600 mb-6">
-                          Commencez par ajouter votre première chaîne YouTube
-                        </p>
-                        <Button
-                          onClick={addNewChannel}
-                          className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 font-medium rounded-lg transition-colors flex items-center gap-2"
-                        >
-                          <Add color="white" size={20} className="text-white" />
-                          Ajouter une chaîne
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center gap-3">
+              <TrendUp color="#10B981" size={24} className="text-green-600" />
+              <div>
+                <p className="text-sm text-gray-600">Abonnés cumulés</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {formatSubscriberCount(channels.reduce((sum, ch) => sum + ch.subscriber_count, 0))}
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* Stats Card */}
-        {channels.length > 0 && (
-          <div className="mt-8 bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistiques</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">
-                  {channels.length}
-                </div>
-                <div className="text-sm text-gray-600">Chaînes totales</div>
-              </div>
-              
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {channels.reduce((sum, ch) => sum + ch.subscriber_count, 0).toLocaleString()}
-                </div>
-                <div className="text-sm text-gray-600">Abonnés cumulés</div>
-              </div>
-              
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
+          
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center gap-3">
+              <User color="#3B82F6" size={24} className="text-blue-600" />
+              <div>
+                <p className="text-sm text-gray-600">Chaînes Mix</p>
+                <p className="text-xl font-bold text-gray-900">
                   {channels.filter(ch => ch.type === 'Mix').length}
-                </div>
-                <div className="text-sm text-gray-600">Chaînes Mix</div>
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center gap-3">
+              <Filter color="#8B5CF6" size={24} className="text-purple-600" />
+              <div>
+                <p className="text-sm text-gray-600">Spécialisées</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {channels.filter(ch => ch.type === 'Only').length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search and Filters */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="space-y-4">
+          {/* Search Bar */}
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex-1">
+              <SearchInput
+                placeholder="Rechercher par nom, URL ou domaine..."
+                value={filters.search}
+                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                showSearchIcon={true}
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
+                  showFilters 
+                    ? 'bg-red-50 border-red-200 text-red-700' 
+                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Filter color={showFilters ? "#DC2626" : "#6B7280"} size={16} className={showFilters ? "text-red-600" : "text-gray-500"} />
+                Filtres
+              </Button>
+              
+              {(filters.tag || filters.type || filters.search) && (
+                <Button
+                  onClick={clearFilters}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                >
+                  <CloseCircle color="#6B7280" size={16} className="text-gray-500" />
+                  Effacer
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Options */}
+          {showFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+              <div>
+                <CustomSelect
+                  label="Filtrer par tag"
+                  options={[{ value: '', label: 'Tous les tags' }, ...getTagOptions()]}
+                  value={filters.tag || ''}
+                  onChange={(value) => setFilters(prev => ({ ...prev, tag: value || null }))}
+                  placeholder="Sélectionner un tag"
+                />
               </div>
               
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  {channels.filter(ch => ch.type === 'Only').length}
-                </div>
-                <div className="text-sm text-gray-600">Chaînes Spécialisées</div>
+              <div>
+                <CustomSelect
+                  label="Filtrer par type"
+                  options={[{ value: '', label: 'Tous les types' }, ...getTypeOptions()]}
+                  value={filters.type || ''}
+                  onChange={(value) => setFilters(prev => ({ ...prev, type: value || null }))}
+                  placeholder="Sélectionner un type"
+                />
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Tag Distribution */}
-        {channels.length > 0 && (
-          <div className="mt-6 bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Tag</h3>
-            <div className="flex flex-wrap gap-3">
-              {getTagOptions().map(tag => {
-                const count = channels.filter(ch => ch.tag === tag.value).length;
-                if (count === 0) return null;
-                
-                return (
-                  <div key={tag.value} className="flex items-center gap-2">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getTagColor(tag.value as TagType)}`}>
-                      {tag.value}
-                    </span>
-                    <span className="text-sm text-gray-600">({count})</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Help Section */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
-          <div className="flex items-start gap-3">
-            <div className="bg-blue-100 rounded-full p-2 flex-shrink-0">
-              <Youtube color="#3B82F6" size={20} className="text-blue-600" />
-            </div>
-            <div>
-              <h3 className="font-medium text-blue-900 mb-2">Guide d'utilisation</h3>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Cliquez sur "Ajouter une chaîne" pour créer une nouvelle entrée</li>
-                <li>• Collez l'URL YouTube et les données seront extraites automatiquement</li>
-                <li>• Sélectionnez le tag de langue (VF, VOSTFR, VA, VOSTA, VO)</li>
-                <li>• Choisissez le type: Mix (contenu varié) ou Only (domaine spécifique)</li>
-                <li>• Pour le type "Only", spécifiez le domaine (Gaming, Tech, Music, etc.)</li>
-                <li>• Utilisez les boutons d'action pour modifier ou supprimer une chaîne</li>
-              </ul>
-            </div>
+          {/* Sort Options */}
+          <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-gray-200">
+            <span className="text-sm font-medium text-gray-700">Trier par:</span>
+            
+            <Button
+              onClick={() => handleSort('username')}
+              className={getSortButtonClass('username')}
+            >
+              <span>Nom</span>
+              {renderSortIcon('username')}
+            </Button>
+            
+            <Button
+              onClick={() => handleSort('subscriber_count')}
+              className={getSortButtonClass('subscriber_count')}
+            >
+              <span>Abonnés</span>
+              {renderSortIcon('subscriber_count')}
+            </Button>
+            
+            <Button
+              onClick={() => handleSort('tag')}
+              className={getSortButtonClass('tag')}
+            >
+              <span>Tag</span>
+              {renderSortIcon('tag')}
+            </Button>
+            
+            <Button
+              onClick={() => handleSort('type')}
+              className={getSortButtonClass('type')}
+            >
+              <span>Type</span>
+              {renderSortIcon('type')}
+            </Button>
+            
+            <Button
+              onClick={() => handleSort('created_at')}
+              className={getSortButtonClass('created_at')}
+            >
+              <span>Date d'ajout</span>
+              {renderSortIcon('created_at')}
+            </Button>
           </div>
         </div>
       </div>
+
+      {/* Results Info */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          {filteredChannels.length} chaîne{filteredChannels.length > 1 ? 's' : ''} trouvée{filteredChannels.length > 1 ? 's' : ''}
+          {channels.length !== filteredChannels.length && ` sur ${channels.length} au total`}
+        </p>
+      </div>
+
+      {/* Channels Grid */}
+      {filteredChannels.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          {channels.length === 0 ? (
+            // No channels at all
+            <>
+              <Youtube color="#9CA3AF" size={64} className="text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Aucune chaîne enregistrée
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Commencez par ajouter votre première chaîne YouTube pour traiter des Shorts
+              </p>
+              <Button
+                onClick={openAddModal}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 font-medium rounded-lg transition-colors flex items-center gap-2 mx-auto"
+              >
+                <Add color="white" size={20} className="text-white" />
+                Ajouter votre première chaîne
+              </Button>
+            </>
+          ) : (
+            // No results for current filters
+            <>
+              <SearchNormal1 color="#9CA3AF" size={64} className="text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Aucun résultat trouvé
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Aucune chaîne ne correspond à vos critères de recherche
+              </p>
+              <Button
+                onClick={clearFilters}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 font-medium rounded-lg transition-colors flex items-center gap-2 mx-auto"
+              >
+                <CloseCircle color="white" size={20} className="text-white" />
+                Effacer les filtres
+              </Button>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredChannels.map((channel) => (
+            <div
+              key={channel.id}
+              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200"
+            >
+              {/* Channel Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="bg-red-100 rounded-full p-2 flex-shrink-0">
+                    <Youtube color="#FF0000" size={20} className="text-red-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-gray-900 truncate" title={channel.username}>
+                      {channel.username}
+                    </h3>
+                    <div className="flex items-center gap-1 text-sm text-gray-600">
+                      <TrendUp color="#6B7280" size={14} className="text-gray-500" />
+                      <span>{formatSubscriberCount(channel.subscriber_count)} abonnés</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Button
+                    onClick={() => window.open(channel.youtube_url, '_blank')}
+                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Voir la chaîne YouTube"
+                  >
+                    <LinkIcon color="#6B7280" size={16} className="text-gray-500" />
+                  </Button>
+                  <Button
+                    onClick={() => openEditModal(channel)}
+                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Modifier"
+                  >
+                    <Edit color="#6B7280" size={16} className="text-gray-500" />
+                  </Button>
+                  <Button
+                    onClick={() => openDeleteModal(channel)}
+                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Supprimer"
+                  >
+                    <Trash color="#6B7280" size={16} className="text-gray-500" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div className="flex items-center gap-2 mb-4">
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getTagColor(channel.tag)}`}>
+                  {channel.tag}
+                </span>
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getChannelTypeColor(channel.type)}`}>
+                  {channel.type}
+                </span>
+              </div>
+
+              {/* Domain (if Only type) */}
+              {channel.domain && (
+                <div className="mb-4">
+                  <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+                    {channel.domain}
+                  </span>
+                </div>
+              )}
+
+              {/* URL Preview */}
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <User color="#6B7280" size={14} className="text-gray-500 flex-shrink-0" />
+                  <span className="text-xs text-gray-600 truncate font-mono">
+                    {channel.youtube_url}
+                  </span>
+                </div>
+              </div>
+
+              {/* Footer with creation date */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  Ajoutée le {new Date(channel.created_at).toLocaleDateString('fr-FR', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                  })}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tag Distribution (only show if there are channels) */}
+      {channels.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Tag</h3>
+          <div className="flex flex-wrap gap-3">
+            {getTagOptions().map(tag => {
+              const count = channels.filter(ch => ch.tag === tag.value).length;
+              const filteredCount = filteredChannels.filter(ch => ch.tag === tag.value).length;
+              
+              if (count === 0) return null;
+              
+              return (
+                <div key={tag.value} className="flex items-center gap-2">
+                  <button
+                    onClick={() => setFilters(prev => ({ 
+                      ...prev, 
+                      tag: prev.tag === tag.value ? null : tag.value 
+                    }))}
+                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                      filters.tag === tag.value
+                        ? getTagColor(tag.value as TagType)
+                        : `${getTagColor(tag.value as TagType)} opacity-60 hover:opacity-100`
+                    }`}
+                  >
+                    {tag.value}
+                  </button>
+                  <span className="text-sm text-gray-600">
+                    ({filters.tag ? filteredCount : count})
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      <ChannelModal
+        isOpen={isChannelModalOpen}
+        onClose={() => setIsChannelModalOpen(false)}
+        onSave={handleModalSave}
+        editingChannel={editingChannel}
+      />
+
+      <DeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onDelete={handleDeleteComplete}
+        channel={deletingChannel}
+      />
     </div>
   );
 };
