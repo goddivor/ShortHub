@@ -5,6 +5,8 @@ import LandingPage from "./LandingPage";
 import AddChannelPage from "./AddChannelPage";
 import RollShortsPage from "./RollShortsPage";
 import DebugPage from "./DebugPage";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import DashboardPage from "./DashboardPage";
 
 const router = createBrowserRouter([
   {
@@ -13,9 +15,16 @@ const router = createBrowserRouter([
     // Mounted where the <Outlet /> component is inside the root layout
     children: [
       { path: "/", element: <LandingPage /> },
-      { path: "/add-channel", element: <AddChannelPage /> },
-       { path: "/roll-shorts", element: <RollShortsPage /> },
-       { path: "/debug", element: <DebugPage /> },
+      {
+        path: "/dashboard",
+        element: <DashboardLayout />,
+        children: [
+          { path: "", element: <DashboardPage /> },
+          { path: "add-channel", element: <AddChannelPage /> },
+          { path: "roll-shorts", element: <RollShortsPage /> },
+          { path: "debug", element: <DebugPage /> },
+        ],
+      },
       { path: "*", element: <NotFound /> },
     ],
   },

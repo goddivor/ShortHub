@@ -257,7 +257,6 @@ const RollShortsPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <FloatingNav />
         <div className="text-center">
           <SpinLoader />
           <p className="mt-4 text-gray-600">Chargement des chaînes...</p>
@@ -268,8 +267,6 @@ const RollShortsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <FloatingNav />
-      
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
