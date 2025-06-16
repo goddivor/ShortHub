@@ -108,8 +108,7 @@ export class ChannelService {
 
   // Solution 2: Using RPC Function (Alternative)
   static async getChannelsWithStatsRPC(): Promise<ChannelWithStats[]> {
-    const { data, error } = await supabase
-      .rpc("get_channels_with_stats");
+    const { data, error } = await supabase.rpc("get_channels_with_stats");
 
     if (error) throw error;
     return data || [];
@@ -178,6 +177,65 @@ export class ShortsService {
     return data || [];
   }
 
+  // NEW: Get all unvalidated shorts in a single query
+  static async getAllUnvalidatedShorts(): Promise<ShortsRoll[]> {
+    const { data, error } = await supabase
+      .from("unvalidated_shorts_with_channel")
+      .select("*");
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  // NEW: Get unvalidated shorts grouped by channel (single query + JS grouping)
+  static async getUnvalidatedShortsByChannel(): Promise<
+    Record<string, ShortsRoll[]>
+  > {
+    const allUnvalidatedShorts = await this.getAllUnvalidatedShorts();
+
+    // Group by channel_id using JavaScript
+    const groupedShorts: Record<string, ShortsRoll[]> = {};
+
+    for (const short of allUnvalidatedShorts) {
+      if (!groupedShorts[short.channel_id]) {
+        groupedShorts[short.channel_id] = [];
+      }
+      groupedShorts[short.channel_id].push(short);
+    }
+
+    return groupedShorts;
+  }
+
+  // OPTIONAL: Get unvalidated shorts for specific channels only
+  static async getUnvalidatedShortsForChannels(
+    channelIds: string[]
+  ): Promise<Record<string, ShortsRoll[]>> {
+    if (channelIds.length === 0) return {};
+
+    const { data, error } = await supabase
+      .from("unvalidated_shorts_with_channel")
+      .select("*")
+      .in("channel_id", channelIds);
+
+    if (error) throw error;
+
+    // Group by channel_id
+    const groupedShorts: Record<string, ShortsRoll[]> = {};
+
+    // Initialize empty arrays for all requested channels
+    for (const channelId of channelIds) {
+      groupedShorts[channelId] = [];
+    }
+
+    // Fill with actual data
+    for (const short of data || []) {
+      groupedShorts[short.channel_id].push(short);
+    }
+
+    return groupedShorts;
+  }
+
+  /** @deprecated Use getAllUnvalidatedShorts() or getUnvalidatedShortsByChannel() instead */
   static async getUnvalidatedShortsForChannel(
     channelId: string
   ): Promise<ShortsRoll[]> {

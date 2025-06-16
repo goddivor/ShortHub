@@ -65,26 +65,32 @@ const RollShortsPage: React.FC = () => {
     }
   };
 
+  // OPTIMIZED: Load all pending rolls with a single query
   const loadPendingRolls = async (channelsData: ChannelWithStats[]) => {
-    const newRolledVideos: Record<string, RolledVideo[]> = {};
-    
-    for (const channel of channelsData) {
-      try {
-        const pendingRolls = await ShortsService.getUnvalidatedShortsForChannel(channel.id);
-        newRolledVideos[channel.id] = pendingRolls.map(roll => ({
+    try {
+      // Get all unvalidated shorts in a single query
+      const shortsByChannel = await ShortsService.getUnvalidatedShortsByChannel();
+      
+      // Transform the data to match our component state structure
+      const newRolledVideos: Record<string, RolledVideo[]> = {};
+      
+      // Initialize empty arrays for all channels
+      for (const channel of channelsData) {
+        const channelShorts = shortsByChannel[channel.id] || [];
+        newRolledVideos[channel.id] = channelShorts.map(roll => ({
           id: `${channel.id}-${roll.id}`,
           channelId: channel.id,
           videoUrl: roll.video_url,
           isValidating: false,
           rollId: roll.id
         }));
-      } catch (err) {
-        console.error(`Error loading pending rolls for channel ${channel.id}:`, err);
-        newRolledVideos[channel.id] = [];
       }
+      
+      setRolledVideos(newRolledVideos);
+    } catch (err) {
+      console.error('Error loading pending rolls:', err);
+      error('Erreur de chargement', 'Impossible de charger les shorts en attente');
     }
-    
-    setRolledVideos(newRolledVideos);
   };
 
   const handleRoll = async (channel: ChannelWithStats) => {
