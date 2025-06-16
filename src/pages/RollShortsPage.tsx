@@ -25,13 +25,15 @@ import {
   Link as LinkIcon,
   Chart,
   VideoPlay,
-  Warning2
+  CloseCircle
 } from 'iconsax-react';
 
 interface RolledVideo {
+  id: string;
   channelId: string;
   videoUrl: string;
   isValidating: boolean;
+  rollId: string;
 }
 
 const RollShortsPage: React.FC = () => {
@@ -41,7 +43,7 @@ const RollShortsPage: React.FC = () => {
   const [channels, setChannels] = useState<ChannelWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [rollingStates, setRollingStates] = useState<Record<string, boolean>>({});
-  const [rolledVideos, setRolledVideos] = useState<Record<string, RolledVideo>>({});
+  const [rolledVideos, setRolledVideos] = useState<Record<string, RolledVideo[]>>({});
 
   // Load channels on component mount
   useEffect(() => {
@@ -53,11 +55,36 @@ const RollShortsPage: React.FC = () => {
       setIsLoading(true);
       const channelsData = await ChannelService.getChannelsWithStats();
       setChannels(channelsData);
+      
+      // Load pending rolls for each channel
+      await loadPendingRolls(channelsData);
     } catch (err) {
       error('Erreur de chargement', 'Impossible de charger les chaînes');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loadPendingRolls = async (channelsData: ChannelWithStats[]) => {
+    const newRolledVideos: Record<string, RolledVideo[]> = {};
+    
+    for (const channel of channelsData) {
+      try {
+        const pendingRolls = await ShortsService.getUnvalidatedShortsForChannel(channel.id);
+        newRolledVideos[channel.id] = pendingRolls.map(roll => ({
+          id: `${channel.id}-${roll.id}`,
+          channelId: channel.id,
+          videoUrl: roll.video_url,
+          isValidating: false,
+          rollId: roll.id
+        }));
+      } catch (err) {
+        console.error(`Error loading pending rolls for channel ${channel.id}:`, err);
+        newRolledVideos[channel.id] = [];
+      }
+    }
+    
+    setRolledVideos(newRolledVideos);
   };
 
   const handleRoll = async (channel: ChannelWithStats) => {
@@ -73,7 +100,7 @@ const RollShortsPage: React.FC = () => {
         return;
       }
 
-      // Get already rolled videos for this channel to avoid duplicates
+      // Get already validated videos for this channel to avoid duplicates
       const existingRolls = await ShortsService.getShortsRolls(channel.id);
       const validatedUrls = existingRolls
         .filter(roll => roll.validated)
@@ -93,31 +120,27 @@ const RollShortsPage: React.FC = () => {
       const randomIndex = Math.floor(Math.random() * availableShorts.length);
       const selectedShortUrl = availableShorts[randomIndex];
 
-      // Check if this specific video was already rolled (but not validated)
-      const alreadyRolled = await ShortsService.isVideoAlreadyRolled(channel.id, selectedShortUrl);
-      
-      if (alreadyRolled) {
-        // If already rolled but not validated, just show it again
-        info('Vidéo déjà générée', 'Cette vidéo avait déjà été générée mais pas encore validée');
-      } else {
-        // Save the new roll to database
-        await ShortsService.createShortsRoll({
-          channel_id: channel.id,
-          video_url: selectedShortUrl,
-        });
-      }
+      // Always create a new roll (even if the same video was rolled before but not validated)
+      const newRoll = await ShortsService.createShortsRoll({
+        channel_id: channel.id,
+        video_url: selectedShortUrl,
+      });
 
-      // Update local state
+      // Add to local state
+      const newRolledVideo: RolledVideo = {
+        id: `${channel.id}-${newRoll.id}`,
+        channelId: channel.id,
+        videoUrl: selectedShortUrl,
+        isValidating: false,
+        rollId: newRoll.id
+      };
+
       setRolledVideos(prev => ({
         ...prev,
-        [channel.id]: {
-          channelId: channel.id,
-          videoUrl: selectedShortUrl,
-          isValidating: false,
-        }
+        [channel.id]: [...(prev[channel.id] || []), newRolledVideo]
       }));
 
-      success('Short généré !', 'Cliquez sur "Valider" si ce contenu vous convient');
+      success('Short généré !', 'Cliquez sur "Valider" ou "Ignorer" pour ce contenu');
       
     } catch (err) {
       console.error('Error rolling shorts:', err);
@@ -138,52 +161,81 @@ const RollShortsPage: React.FC = () => {
     }
   };
 
-  const handleValidate = async (channel: ChannelWithStats) => {
-    const rolledVideo = rolledVideos[channel.id];
-    if (!rolledVideo) return;
-
+  const handleValidate = async (channel: ChannelWithStats, rolledVideo: RolledVideo) => {
     try {
-      // Set validating state
+      // Set validating state for this specific video
       setRolledVideos(prev => ({
         ...prev,
-        [channel.id]: {
-          ...prev[channel.id],
-          isValidating: true,
-        }
+        [channel.id]: prev[channel.id].map(video => 
+          video.id === rolledVideo.id 
+            ? { ...video, isValidating: true }
+            : video
+        )
       }));
 
-      // Find the shorts roll in database and validate it
-      const shortsRolls = await ShortsService.getShortsRolls(channel.id);
-      const currentRoll = shortsRolls.find(roll => 
-        roll.video_url === rolledVideo.videoUrl && !roll.validated
-      );
+      await ShortsService.validateShortsRoll(rolledVideo.rollId);
+      success('Short validé !', 'Cette vidéo ne sera plus proposée');
+      
+      // Remove from rolled videos
+      setRolledVideos(prev => ({
+        ...prev,
+        [channel.id]: prev[channel.id].filter(video => video.id !== rolledVideo.id)
+      }));
 
-      if (currentRoll) {
-        await ShortsService.validateShortsRoll(currentRoll.id);
-        success('Short validé !', 'Cette vidéo ne sera plus proposée');
-        
-        // Remove from rolled videos
-        setRolledVideos(prev => {
-          const newState = { ...prev };
-          delete newState[channel.id];
-          return newState;
-        });
-
-        // Refresh channel stats
-        loadChannels();
-      } else {
-        error('Erreur de validation', 'Impossible de trouver cette vidéo');
-      }
+      // Refresh channel stats
+      loadChannels();
       
     } catch (err) {
       error('Erreur de validation', 'Impossible de valider cette vidéo');
-    } finally {
+      
+      // Reset validating state on error
       setRolledVideos(prev => ({
         ...prev,
-        [channel.id]: {
-          ...prev[channel.id],
-          isValidating: false,
-        }
+        [channel.id]: prev[channel.id].map(video => 
+          video.id === rolledVideo.id 
+            ? { ...video, isValidating: false }
+            : video
+        )
+      }));
+    }
+  };
+
+  const handleIgnore = async (channel: ChannelWithStats, rolledVideo: RolledVideo) => {
+    try {
+      // Set validating state for this specific video (reuse the same state)
+      setRolledVideos(prev => ({
+        ...prev,
+        [channel.id]: prev[channel.id].map(video => 
+          video.id === rolledVideo.id 
+            ? { ...video, isValidating: true }
+            : video
+        )
+      }));
+
+      // Delete the roll from database without validating
+      await ShortsService.deleteShortsRoll(rolledVideo.rollId);
+      info('Short ignoré', 'Cette vidéo pourra être générée à nouveau');
+      
+      // Remove from rolled videos
+      setRolledVideos(prev => ({
+        ...prev,
+        [channel.id]: prev[channel.id].filter(video => video.id !== rolledVideo.id)
+      }));
+
+      // Refresh channel stats
+      loadChannels();
+      
+    } catch (err) {
+      error('Erreur', 'Impossible d\'ignorer cette vidéo');
+      
+      // Reset validating state on error
+      setRolledVideos(prev => ({
+        ...prev,
+        [channel.id]: prev[channel.id].map(video => 
+          video.id === rolledVideo.id 
+            ? { ...video, isValidating: false }
+            : video
+        )
       }));
     }
   };
@@ -224,20 +276,6 @@ const RollShortsPage: React.FC = () => {
           <p className="text-gray-600">
             Générez et validez des YouTube Shorts depuis vos chaînes enregistrées
           </p>
-        </div>
-
-        {/* API Status Warning */}
-        <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            <Warning2 color="#F59E0B" size={20} className="text-yellow-600 mt-0.5" />
-            <div>
-              <h3 className="font-medium text-yellow-900 mb-1">Configuration YouTube API</h3>
-              <p className="text-sm text-yellow-800">
-                Assurez-vous que votre clé YouTube API est configurée dans les variables d'environnement 
-                (<code className="bg-yellow-100 px-1 rounded">VITE_YOUTUBE_API_KEY</code>) pour utiliser cette fonctionnalité.
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* Stats Overview */}
@@ -298,7 +336,7 @@ const RollShortsPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {channels.map((channel) => {
               const isRolling = rollingStates[channel.id];
-              const rolledVideo = rolledVideos[channel.id];
+              const channelRolledVideos = rolledVideos[channel.id] || [];
               
               return (
                 <div key={channel.id} className="bg-white rounded-xl shadow-sm border p-6">
@@ -353,38 +391,84 @@ const RollShortsPage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Rolled Video Display */}
-                  {rolledVideo && (
-                    <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="font-medium text-blue-900">Short généré:</span>
-                        <Button
-                          onClick={() => openVideoInNewTab(rolledVideo.videoUrl)}
-                          className="text-blue-600 hover:text-blue-800 p-1"
-                          title="Ouvrir dans un nouvel onglet"
-                        >
-                          <LinkIcon color="#2563EB" size={16} className="text-blue-600" />
-                        </Button>
-                      </div>
-                      <div className="text-sm text-blue-800 bg-blue-100 p-2 rounded font-mono break-all">
-                        {rolledVideo.videoUrl}
-                      </div>
+                  {/* Rolled Videos Display */}
+                  {channelRolledVideos.length > 0 && (
+                    <div className="mb-4 space-y-3">
+                      <h4 className="font-medium text-gray-900">Shorts générés ({channelRolledVideos.length}):</h4>
+                      {channelRolledVideos.map((rolledVideo) => (
+                        <div key={rolledVideo.id} className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="font-medium text-blue-900">Short:</span>
+                            <Button
+                              onClick={() => openVideoInNewTab(rolledVideo.videoUrl)}
+                              className="text-blue-600 hover:text-blue-800 p-1"
+                              title="Ouvrir dans un nouvel onglet"
+                            >
+                              <LinkIcon color="#2563EB" size={16} className="text-blue-600" />
+                            </Button>
+                          </div>
+                          <div className="text-sm text-blue-800 bg-blue-100 p-2 rounded font-mono break-all mb-3">
+                            {rolledVideo.videoUrl}
+                          </div>
+                          
+                          {/* Action buttons for each video */}
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => handleValidate(channel, rolledVideo)}
+                              disabled={rolledVideo.isValidating}
+                              className="flex-1 py-2 px-3 text-sm font-medium rounded bg-green-600 hover:bg-green-700 text-white transition-all flex items-center justify-center gap-2"
+                              title="Valider ce Short"
+                            >
+                              {rolledVideo.isValidating ? (
+                                <>
+                                  <SpinLoader />
+                                  <span>Validation...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <TickCircle color="currentColor" size={16} className="flex-shrink-0" />
+                                  <span>Valider</span>
+                                </>
+                              )}
+                            </Button>
+                            
+                            <Button
+                              onClick={() => handleIgnore(channel, rolledVideo)}
+                              disabled={rolledVideo.isValidating}
+                              className="flex-1 py-2 px-3 text-sm font-medium rounded bg-gray-600 hover:bg-gray-700 text-white transition-all flex items-center justify-center gap-2"
+                              title="Ignorer ce Short"
+                            >
+                              {rolledVideo.isValidating ? (
+                                <>
+                                  <SpinLoader />
+                                  <span>Suppression...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CloseCircle color="currentColor" size={16} className="flex-shrink-0" />
+                                  <span>Ignorer</span>
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-3">
+                  {/* Roll Button */}
+                  <div className="mb-4">
                     <Button
                       onClick={() => handleRoll(channel)}
-                      disabled={isRolling || !!rolledVideo}
+                      disabled={isRolling}
                       className={`
-                        flex-1 py-3 px-4 font-medium rounded-lg transition-all flex items-center justify-center gap-2
-                        ${isRolling || rolledVideo 
+                        w-full py-3 px-4 font-medium rounded-lg transition-all flex items-center justify-center gap-2
+                        ${isRolling 
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                           : 'bg-red-600 hover:bg-red-700 text-white'
                         }
                       `}
-                      title={rolledVideo ? "Validez d'abord le Short actuel" : "Générer un nouveau Short"}
+                      title="Générer un nouveau Short"
                     >
                       {isRolling ? (
                         <>
@@ -394,35 +478,14 @@ const RollShortsPage: React.FC = () => {
                       ) : (
                         <>
                           <Refresh color="currentColor" size={18} className="flex-shrink-0" />
-                          <span>Roll</span>
+                          <span>Générer un Short</span>
                         </>
                       )}
                     </Button>
-
-                    {rolledVideo && (
-                      <Button
-                        onClick={() => handleValidate(channel)}
-                        disabled={rolledVideo.isValidating}
-                        className="flex-1 py-3 px-4 font-medium rounded-lg bg-green-600 hover:bg-green-700 text-white transition-all flex items-center justify-center gap-2"
-                        title="Valider ce Short"
-                      >
-                        {rolledVideo.isValidating ? (
-                          <>
-                            <SpinLoader />
-                            <span>Validation...</span>
-                          </>
-                        ) : (
-                          <>
-                            <TickCircle color="currentColor" size={18} className="flex-shrink-0" />
-                            <span>Valider</span>
-                          </>
-                        )}
-                      </Button>
-                    )}
                   </div>
 
                   {/* Channel URL Link */}
-                  <div className="mt-4 pt-4 border-t">
+                  <div className="pt-4 border-t">
                     <Button
                       onClick={() => openVideoInNewTab(channel.youtube_url)}
                       className="text-sm text-gray-600 hover:text-red-600 transition-colors flex items-center gap-2"
@@ -435,18 +498,6 @@ const RollShortsPage: React.FC = () => {
                 </div>
               );
             })}
-          </div>
-        )}
-
-        {/* Add Channel Button */}
-        {channels.length > 0 && (
-          <div className="mt-8 text-center">
-            <Button
-              onClick={navigateToAddChannel}
-              className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 font-medium rounded-lg transition-colors"
-            >
-              Ajouter une nouvelle chaîne
-            </Button>
           </div>
         )}
       </div>

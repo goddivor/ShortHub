@@ -182,6 +182,12 @@ export class ShortsService {
     return data;
   }
 
+  static async deleteShortsRoll(id: string): Promise<void> {
+    const { error } = await supabase.from("shorts_rolls").delete().eq("id", id);
+
+    if (error) throw error;
+  }
+
   static async getShortsRolls(channelId?: string): Promise<ShortsRoll[]> {
     let query = supabase
       .from("shorts_rolls")
