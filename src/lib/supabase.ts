@@ -96,54 +96,23 @@ export class ChannelService {
     return data;
   }
 
+  // Solution 1: Using the SQL View (Recommended)
   static async getChannelsWithStats(): Promise<ChannelWithStats[]> {
-    // Get channels first
-    const { data: channels, error: channelsError } = await supabase
-      .from("channels")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("channels_with_stats")
+      .select("*");
 
-    if (channelsError) throw channelsError;
+    if (error) throw error;
+    return data || [];
+  }
 
-    // Get stats for each channel
-    const channelsWithStats: ChannelWithStats[] = [];
+  // Solution 2: Using RPC Function (Alternative)
+  static async getChannelsWithStatsRPC(): Promise<ChannelWithStats[]> {
+    const { data, error } = await supabase
+      .rpc("get_channels_with_stats");
 
-    for (const channel of channels || []) {
-      // Get total rolls count
-      const { count: totalCount, error: totalError } = await supabase
-        .from("shorts_rolls")
-        .select("*", { count: "exact", head: true })
-        .eq("channel_id", channel.id);
-
-      if (totalError) throw totalError;
-
-      // Get validated rolls count
-      const { count: validatedCount, error: validatedError } = await supabase
-        .from("shorts_rolls")
-        .select("*", { count: "exact", head: true })
-        .eq("channel_id", channel.id)
-        .eq("validated", true);
-
-      if (validatedError) throw validatedError;
-
-      // Get pending rolls count
-      const { count: pendingCount, error: pendingError } = await supabase
-        .from("shorts_rolls")
-        .select("*", { count: "exact", head: true })
-        .eq("channel_id", channel.id)
-        .eq("validated", false);
-
-      if (pendingError) throw pendingError;
-
-      channelsWithStats.push({
-        ...channel,
-        total_rolls: totalCount || 0,
-        validated_rolls: validatedCount || 0,
-        pending_rolls: pendingCount || 0,
-      });
-    }
-
-    return channelsWithStats;
+    if (error) throw error;
+    return data || [];
   }
 
   static async updateChannel(
