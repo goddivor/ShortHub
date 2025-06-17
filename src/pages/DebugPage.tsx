@@ -26,8 +26,7 @@ const DebugPage: React.FC = () => {
       results.push('✅ Supabase client initialized');
       
       // Test 1: Basic connection
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { data, error } = await supabase.from('channels').select('count');
+      const { error } = await supabase.from('channels').select('count');
       
       if (error) {
         results.push(`❌ Database error: ${error.message}`);
@@ -125,20 +124,20 @@ const DebugPage: React.FC = () => {
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">Environment Variables</h2>
             <div className="bg-gray-100 p-4 rounded-lg">
-              <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                 <div>
                   <strong>VITE_SUPABASE_URL:</strong>
                   <span className={envVars.url === 'MISSING' ? 'text-red-600' : 'text-green-600'}>
-                    {envVars.url}
+                  {envVars.url}
                   </span>
                 </div>
                 <div>
                   <strong>VITE_SUPABASE_ANON_KEY:</strong>
                   <span className={envVars.key === 'MISSING' ? 'text-red-600' : 'text-green-600'}>
-                    {envVars.key}
+                  {envVars.key}
                   </span>
                 </div>
-              </div>
+                </div>
             </div>
           </div>
 

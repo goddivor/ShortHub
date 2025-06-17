@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // src/pages/RollShortsPage.tsx
 import React, { useState, useEffect } from 'react';
@@ -13,25 +14,18 @@ import {
 } from '@/lib/supabase';
 import { getChannelShorts } from '@/lib/youtube-api';
 import Button from '@/components/Button';
-import Badge from '@/components/badge';
 import SpinLoader from '@/components/SpinLoader';
 import { 
   Youtube, 
-  Play, 
   TickCircle, 
   Refresh, 
   User, 
   TrendUp,
   Link as LinkIcon,
-  Chart,
   VideoPlay,
   CloseCircle,
   Timer,
-  Add,
-  Filter,
-  ArrowUp2,
-  ArrowDown2
-} from 'iconsax-react';
+  Add} from 'iconsax-react';
 
 interface RolledVideo {
   id: string;

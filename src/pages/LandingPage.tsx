@@ -104,7 +104,7 @@ const LandingPage: React.FC = () => {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Button
-                onClick={() => navigate('/add-channel')}
+                onClick={() => navigate('dashboard/add-channel')}
                 className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 text-lg font-semibold transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:-translate-y-1"
               >
                 <User color="white" size={24} className="text-white mr-2" />
@@ -112,7 +112,7 @@ const LandingPage: React.FC = () => {
               </Button>
               
               <Button
-                onClick={() => navigate('/roll-shorts')}
+                onClick={() => navigate('dashboard/roll-shorts')}
                 className="bg-white hover:bg-gray-50 text-gray-900 border-2 border-gray-200 px-8 py-4 text-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
               >
                 <VideoPlay color="#FF0000" size={24} className="text-red-600 mr-2" />
@@ -252,7 +252,7 @@ const LandingPage: React.FC = () => {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
-                onClick={() => navigate('/add-channel')}
+                onClick={() => navigate('dashboard/add-channel')}
                 className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 text-lg font-semibold transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:-translate-y-1"
               >
                 <User color="white" size={24} className="text-white mr-2" />
@@ -260,7 +260,7 @@ const LandingPage: React.FC = () => {
               </Button>
               
               <Button
-                onClick={() => navigate('/debug')}
+                onClick={() => navigate('dashboard/debug')}
                 className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-4 text-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
               >
                 <Setting color="white" size={24} className="text-white mr-2" />
@@ -281,13 +281,13 @@ const LandingPage: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-6">
-              <a href="/add-channel" className="text-gray-400 hover:text-white transition-colors">
+              <a href="dashboard/add-channel" className="text-gray-400 hover:text-white transition-colors">
                 Ajouter Chaîne
               </a>
-              <a href="/roll-shorts" className="text-gray-400 hover:text-white transition-colors">
+              <a href="dashboard/roll-shorts" className="text-gray-400 hover:text-white transition-colors">
                 Générer Shorts
               </a>
-              <a href="/debug" className="text-gray-400 hover:text-white transition-colors">
+              <a href="dashboard/debug" className="text-gray-400 hover:text-white transition-colors">
                 Debug
               </a>
             </div>
