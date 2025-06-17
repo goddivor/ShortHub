@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // src/pages/RollShortsPage.tsx
@@ -8,13 +9,18 @@ import {
   ChannelService, 
   ShortsService, 
   type ChannelWithStats, 
+  type TagType,
   formatSubscriberCount,
   getTagColor,
-  getChannelTypeColor 
+  getChannelTypeColor,
+  getTagOptions,
+  getTypeOptions
 } from '@/lib/supabase';
 import { getChannelShorts } from '@/lib/youtube-api';
 import Button from '@/components/Button';
 import SpinLoader from '@/components/SpinLoader';
+import { SearchInput } from '@/components/forms/search-input';
+import { CustomSelect } from '@/components/forms/custom-select';
 import { 
   Youtube, 
   TickCircle, 
@@ -25,7 +31,12 @@ import {
   VideoPlay,
   CloseCircle,
   Timer,
-  Add} from 'iconsax-react';
+  Add,
+  Filter,
+  SearchNormal1,
+  ArrowUp2,
+  ArrowDown2
+} from 'iconsax-react';
 
 interface RolledVideo {
   id: string;
@@ -35,20 +46,47 @@ interface RolledVideo {
   rollId: string;
 }
 
+type SortField = 'username' | 'subscriber_count' | 'total_rolls' | 'validated_rolls' | 'pending_rolls' | 'tag' | 'type';
+type SortDirection = 'asc' | 'desc';
+
+interface FilterState {
+  tag: string | null;
+  type: string | null;
+  search: string;
+  hasActivity: boolean | null; // Filter for channels with/without activity
+}
+
 const RollShortsPage: React.FC = () => {
   const navigate = useNavigate();
   const { success, error, info, warning } = useToast();
   
   // State management
   const [channels, setChannels] = useState<ChannelWithStats[]>([]);
+  const [filteredChannels, setFilteredChannels] = useState<ChannelWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [rollingStates, setRollingStates] = useState<Record<string, boolean>>({});
   const [rolledVideos, setRolledVideos] = useState<Record<string, RolledVideo[]>>({});
+
+  // Filter and sort states
+  const [filters, setFilters] = useState<FilterState>({
+    tag: null,
+    type: null,
+    search: '',
+    hasActivity: null
+  });
+  const [sortField, setSortField] = useState<SortField>('pending_rolls');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Load channels on component mount
   useEffect(() => {
     loadChannels();
   }, []);
+
+  // Apply filters and sorting when data or filters change
+  useEffect(() => {
+    applyFiltersAndSort();
+  }, [channels, filters, sortField, sortDirection]);
 
   const loadChannels = async () => {
     try {
@@ -63,6 +101,79 @@ const RollShortsPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const applyFiltersAndSort = () => {
+    let filtered = [...channels];
+
+    // Apply search filter
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      filtered = filtered.filter(channel => 
+        channel.username.toLowerCase().includes(searchTerm) ||
+        channel.youtube_url.toLowerCase().includes(searchTerm) ||
+        (channel.domain && channel.domain.toLowerCase().includes(searchTerm))
+      );
+    }
+
+    // Apply tag filter
+    if (filters.tag) {
+      filtered = filtered.filter(channel => channel.tag === filters.tag);
+    }
+
+    // Apply type filter
+    if (filters.type) {
+      filtered = filtered.filter(channel => channel.type === filters.type);
+    }
+
+    // Apply activity filter
+    if (filters.hasActivity !== null) {
+      filtered = filtered.filter(channel => {
+        const hasActivity = channel.total_rolls > 0;
+        return filters.hasActivity ? hasActivity : !hasActivity;
+      });
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue: any = a[sortField];
+      let bValue: any = b[sortField];
+
+      // Handle different data types
+      if (['subscriber_count', 'total_rolls', 'validated_rolls', 'pending_rolls'].includes(sortField)) {
+        aValue = Number(aValue) || 0;
+        bValue = Number(bValue) || 0;
+      } else {
+        aValue = String(aValue).toLowerCase();
+        bValue = String(bValue).toLowerCase();
+      }
+
+      if (sortDirection === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+    });
+
+    setFilteredChannels(filtered);
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      tag: null,
+      type: null,
+      search: '',
+      hasActivity: null
+    });
   };
 
   // OPTIMIZED: Load all pending rolls with a single query
@@ -254,10 +365,28 @@ const RollShortsPage: React.FC = () => {
     navigate('/dashboard/add-channel');
   };
 
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) return null;
+    
+    return sortDirection === 'asc' ? (
+      <ArrowUp2 color="#6B7280" size={14} className="text-gray-500" />
+    ) : (
+      <ArrowDown2 color="#6B7280" size={14} className="text-gray-500" />
+    );
+  };
+
+  const getSortButtonClass = (field: SortField) => {
+    return `flex items-center gap-1 text-sm font-medium transition-colors ${
+      sortField === field 
+        ? 'text-red-600' 
+        : 'text-gray-600 hover:text-gray-900'
+    }`;
+  };
+
   // Calculate total stats
-  const totalValidated = channels.reduce((sum, ch) => sum + ch.validated_rolls, 0);
-  const totalPending = channels.reduce((sum, ch) => sum + ch.pending_rolls, 0);
-  const totalSubscribers = channels.reduce((sum, ch) => sum + ch.subscriber_count, 0);
+  const totalValidated = filteredChannels.reduce((sum, ch) => sum + ch.validated_rolls, 0);
+  const totalPending = filteredChannels.reduce((sum, ch) => sum + ch.pending_rolls, 0);
+  const totalSubscribers = filteredChannels.reduce((sum, ch) => sum + ch.subscriber_count, 0);
 
   if (isLoading) {
     return (
@@ -298,8 +427,8 @@ const RollShortsPage: React.FC = () => {
           <div className="flex items-center gap-3">
             <Youtube color="#FF0000" size={24} className="text-red-600" />
             <div>
-              <p className="text-sm text-gray-600">Chaînes enregistrées</p>
-              <p className="text-xl font-bold text-gray-900">{channels.length}</p>
+              <p className="text-sm text-gray-600">Chaînes filtrées</p>
+              <p className="text-xl font-bold text-gray-900">{filteredChannels.length}</p>
             </div>
           </div>
         </div>
@@ -335,10 +464,155 @@ const RollShortsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Search and Filters */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="space-y-4">
+          {/* Search Bar */}
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex-1">
+              <SearchInput
+                placeholder="Rechercher par nom, URL ou domaine..."
+                value={filters.search}
+                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                showSearchIcon={true}
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
+                  showFilters 
+                    ? 'bg-red-50 border-red-200 text-red-700' 
+                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Filter color={showFilters ? "#DC2626" : "#6B7280"} size={16} className={showFilters ? "text-red-600" : "text-gray-500"} />
+                Filtres
+              </Button>
+              
+              {(filters.tag || filters.type || filters.search || filters.hasActivity !== null) && (
+                <Button
+                  onClick={clearFilters}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                >
+                  <CloseCircle color="#6B7280" size={16} className="text-gray-500" />
+                  Effacer
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Options */}
+          {showFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
+              <div>
+                <CustomSelect
+                  label="Filtrer par tag"
+                  options={[{ value: '', label: 'Tous les tags' }, ...getTagOptions()]}
+                  value={filters.tag || ''}
+                  onChange={(value) => setFilters(prev => ({ ...prev, tag: value || null }))}
+                  placeholder="Sélectionner un tag"
+                />
+              </div>
+              
+              <div>
+                <CustomSelect
+                  label="Filtrer par type"
+                  options={[{ value: '', label: 'Tous les types' }, ...getTypeOptions()]}
+                  value={filters.type || ''}
+                  onChange={(value) => setFilters(prev => ({ ...prev, type: value || null }))}
+                  placeholder="Sélectionner un type"
+                />
+              </div>
+              
+              <div>
+                <CustomSelect
+                  label="Activité"
+                  options={[
+                    { value: '', label: 'Toutes les chaînes' },
+                    { value: 'active', label: 'Avec activity' },
+                    { value: 'inactive', label: 'Sans activité' }
+                  ]}
+                  value={filters.hasActivity === null ? '' : (filters.hasActivity ? 'active' : 'inactive')}
+                  onChange={(value) => setFilters(prev => ({ 
+                    ...prev, 
+                    hasActivity: value === '' ? null : value === 'active'
+                  }))}
+                  placeholder="Filtrer par activité"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Sort Options */}
+          <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-gray-200">
+            <span className="text-sm font-medium text-gray-700">Trier par:</span>
+            
+            <Button
+              onClick={() => handleSort('username')}
+              className={getSortButtonClass('username')}
+            >
+              <span>Nom</span>
+              {renderSortIcon('username')}
+            </Button>
+            
+            <Button
+              onClick={() => handleSort('subscriber_count')}
+              className={getSortButtonClass('subscriber_count')}
+            >
+              <span>Abonnés</span>
+              {renderSortIcon('subscriber_count')}
+            </Button>
+            
+            <Button
+              onClick={() => handleSort('pending_rolls')}
+              className={getSortButtonClass('pending_rolls')}
+            >
+              <span>En attente</span>
+              {renderSortIcon('pending_rolls')}
+            </Button>
+            
+            <Button
+              onClick={() => handleSort('validated_rolls')}
+              className={getSortButtonClass('validated_rolls')}
+            >
+              <span>Validés</span>
+              {renderSortIcon('validated_rolls')}
+            </Button>
+            
+            <Button
+              onClick={() => handleSort('total_rolls')}
+              className={getSortButtonClass('total_rolls')}
+            >
+              <span>Total rolls</span>
+              {renderSortIcon('total_rolls')}
+            </Button>
+            
+            <Button
+              onClick={() => handleSort('tag')}
+              className={getSortButtonClass('tag')}
+            >
+              <span>Tag</span>
+              {renderSortIcon('tag')}
+            </Button>
+            
+            <Button
+              onClick={() => handleSort('type')}
+              className={getSortButtonClass('type')}
+            >
+              <span>Type</span>
+              {renderSortIcon('type')}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* Results Info */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
-          {channels.length} chaîne{channels.length > 1 ? 's' : ''} disponible{channels.length > 1 ? 's' : ''} pour la génération
+          {filteredChannels.length} chaîne{filteredChannels.length > 1 ? 's' : ''} trouvée{filteredChannels.length > 1 ? 's' : ''}
+          {channels.length !== filteredChannels.length && ` sur ${channels.length} au total`}
         </p>
         
         <Button
@@ -351,26 +625,49 @@ const RollShortsPage: React.FC = () => {
       </div>
 
       {/* Channels Grid */}
-      {channels.length === 0 ? (
+      {filteredChannels.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <VideoPlay color="#9CA3AF" size={64} className="text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            Aucune chaîne disponible
-          </h3>
-          <p className="text-gray-600 mb-6">
-            Commencez par ajouter des chaînes YouTube pour générer des Shorts
-          </p>
-          <Button
-            onClick={navigateToAddChannel}
-            className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 font-medium rounded-lg transition-colors flex items-center gap-2 mx-auto"
-          >
-            <Add color="white" size={20} className="text-white" />
-            Ajouter votre première chaîne
-          </Button>
+          {channels.length === 0 ? (
+            // No channels at all
+            <>
+              <VideoPlay color="#9CA3AF" size={64} className="text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Aucune chaîne disponible
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Commencez par ajouter des chaînes YouTube pour générer des Shorts
+              </p>
+              <Button
+                onClick={navigateToAddChannel}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 font-medium rounded-lg transition-colors flex items-center gap-2 mx-auto"
+              >
+                <Add color="white" size={20} className="text-white" />
+                Ajouter votre première chaîne
+              </Button>
+            </>
+          ) : (
+            // No results for current filters
+            <>
+              <SearchNormal1 color="#9CA3AF" size={64} className="text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Aucun résultat trouvé
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Aucune chaîne ne correspond à vos critères de recherche
+              </p>
+              <Button
+                onClick={clearFilters}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 font-medium rounded-lg transition-colors flex items-center gap-2 mx-auto"
+              >
+                <CloseCircle color="white" size={20} className="text-white" />
+                Effacer les filtres
+              </Button>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {channels.map((channel) => {
+          {filteredChannels.map((channel) => {
             const isRolling = rollingStates[channel.id];
             const channelRolledVideos = rolledVideos[channel.id] || [];
             
@@ -538,10 +835,46 @@ const RollShortsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Performance Summary (only show if there are channels) */}
+      {/* Tag Distribution (only show if there are channels) */}
       {channels.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Globale</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Tag</h3>
+          <div className="flex flex-wrap gap-3">
+            {getTagOptions().map(tag => {
+              const count = channels.filter(ch => ch.tag === tag.value).length;
+              const filteredCount = filteredChannels.filter(ch => ch.tag === tag.value).length;
+              
+              if (count === 0) return null;
+              
+              return (
+                <div key={tag.value} className="flex items-center gap-2">
+                  <button
+                    onClick={() => setFilters(prev => ({ 
+                      ...prev, 
+                      tag: prev.tag === tag.value ? null : tag.value 
+                    }))}
+                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                      filters.tag === tag.value
+                        ? getTagColor(tag.value as TagType)
+                        : `${getTagColor(tag.value as TagType)} opacity-60 hover:opacity-100`
+                    }`}
+                  >
+                    {tag.value}
+                  </button>
+                  <span className="text-sm text-gray-600">
+                    ({filters.tag ? filteredCount : count})
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Performance Summary (only show if there are channels) */}
+      {filteredChannels.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance des Chaînes Filtrées</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Validation Rate */}
             <div className="text-center">
@@ -560,7 +893,7 @@ const RollShortsPage: React.FC = () => {
             <div className="text-center">
               <div className="mb-2">
                 <span className="text-2xl font-bold text-blue-600">
-                  {channels.filter(ch => ch.total_rolls > 0).length}
+                  {filteredChannels.filter(ch => ch.total_rolls > 0).length}
                 </span>
               </div>
               <p className="text-sm text-gray-600">Chaînes actives</p>
@@ -570,8 +903,8 @@ const RollShortsPage: React.FC = () => {
             <div className="text-center">
               <div className="mb-2">
                 <span className="text-2xl font-bold text-purple-600">
-                  {channels.length > 0 
-                    ? Math.round((totalValidated + totalPending) / channels.length)
+                  {filteredChannels.length > 0 
+                    ? Math.round((totalValidated + totalPending) / filteredChannels.length)
                     : 0
                   }
                 </span>
