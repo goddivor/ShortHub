@@ -10,10 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@apollo/client": "^4.0.9",
     "@phosphor-icons/react": "^2.1.10",
     "@supabase/supabase-js": "^2.50.0",
     "@tailwindcss/vite": "^4.1.10",
     "class-variance-authority": "^0.7.1",
+    "graphql": "^16.12.0",
+    "graphql-ws": "^6.0.6",
     "iconsax-react": "^0.0.8",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
