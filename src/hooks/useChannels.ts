@@ -1,5 +1,5 @@
 // src/hooks/useChannels.ts
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client/react';
 import {
   GET_CHANNELS_QUERY,
   GET_CHANNEL_QUERY,

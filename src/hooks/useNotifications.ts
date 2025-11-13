@@ -1,5 +1,5 @@
 // src/hooks/useNotifications.ts
-import { useQuery, useMutation, useSubscription } from '@apollo/client';
+import { useQuery, useMutation, useSubscription } from '@apollo/client/react';
 import {
   GET_NOTIFICATIONS_QUERY,
   GET_UNREAD_NOTIFICATIONS_COUNT_QUERY,

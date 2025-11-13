@@ -1,5 +1,5 @@
 // src/hooks/useAnalytics.ts
-import { useQuery } from '@apollo/client';
+import { useQuery } from '@apollo/client/react';
 import {
   GET_DASHBOARD_ANALYTICS_QUERY,
   GET_CHANNEL_ANALYTICS_QUERY,

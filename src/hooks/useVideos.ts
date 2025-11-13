@@ -1,5 +1,5 @@
 // src/hooks/useVideos.ts
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client/react';
 import {
   GET_VIDEOS_QUERY,
   GET_VIDEO_QUERY,
