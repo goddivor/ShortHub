@@ -8,9 +8,10 @@ import { UserRole } from '@/types/graphql';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: UserRole[];
+  requireRole?: UserRole;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, requireRole }) => {
   const { user, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -24,14 +25,19 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
       return;
     }
 
-    // Check if user has required role
+    // Check specific role requirement
+    if (requireRole && user.role !== requireRole) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+
+    // Check if user has any of the allowed roles
     if (allowedRoles && allowedRoles.length > 0) {
       if (!allowedRoles.includes(user.role as UserRole)) {
-        // Redirect to dashboard if user doesn't have required role
         navigate('/dashboard', { replace: true });
       }
     }
-  }, [isAuthenticated, user, loading, allowedRoles, navigate]);
+  }, [isAuthenticated, user, loading, allowedRoles, requireRole, navigate]);
 
   // Show loading spinner while checking auth
   if (loading) {
@@ -50,7 +56,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
     return null;
   }
 
-  // Don't render children if user doesn't have required role
+  // Check role restrictions
+  if (requireRole && user.role !== requireRole) {
+    return null;
+  }
+
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role as UserRole)) {
     return null;
   }

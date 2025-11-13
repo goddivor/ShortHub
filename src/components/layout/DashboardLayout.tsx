@@ -8,10 +8,9 @@ import {
   Home,
   User,
   VideoPlay,
-  Setting2,
   HambergerMenu,
   CloseSquare,
-  Youtube,
+
   Chart,
   TrendUp,
   Logout
@@ -49,12 +48,6 @@ const DashboardLayout: React.FC = () => {
       label: 'Générer Shorts',
       icon: <VideoPlay color="#FF0000" size={20} className="text-red-600" />,
       description: 'Rolling & validation'
-    },
-    {
-      path: '/dashboard/debug',
-      label: 'Debug',
-      icon: <Setting2 color="#6B7280" size={20} className="text-gray-500" />,
-      description: 'Tests & configuration'
     }
   ];
 
@@ -128,21 +121,6 @@ const DashboardLayout: React.FC = () => {
             ))}
           </nav>
 
-          {/* Sidebar Footer */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Youtube color="#FF0000" size={16} className="text-red-600" />
-                <span className="text-sm font-medium text-red-900">ShortHub Pro</span>
-              </div>
-              <p className="text-xs text-red-700 mb-3">
-                Optimisez votre workflow YouTube Shorts
-              </p>
-              <button className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-medium py-2 px-3 rounded-md transition-colors">
-                Upgrade
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
