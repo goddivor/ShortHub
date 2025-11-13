@@ -5,10 +5,21 @@ import LandingPage from "./LandingPage";
 import LoginPage from "./LoginPage";
 import AddChannelPage from "./AddChannelPage";
 import RollShortsPage from "./RollShortsPage";
-import DebugPage from "./DebugPage";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import AdminDashboardLayout from "@/components/layout/AdminDashboardLayout";
 import DashboardPage from "./DashboardPage";
+import DashboardRedirectPage from "./DashboardRedirectPage";
+import AdminDashboardPage from "./admin/AdminDashboardPage";
+import AdminUsersPage from "./admin/AdminUsersPage";
+import AdminChannelsPage from "./admin/AdminChannelsPage";
+import AdminRollingPage from "./admin/AdminRollingPage";
+import AdminAnalyticsPage from "./admin/AdminAnalyticsPage";
+import AdminActivityPage from "./admin/AdminActivityPage";
+import AdminSettingsPage from "./admin/AdminSettingsPage";
+import { VideasteDashboardPage } from "./videaste";
+import { AssistantDashboardPage } from "./assistant";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { UserRole } from "@/types/graphql";
 
 const router = createBrowserRouter([
   {
@@ -18,23 +29,75 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <LandingPage /> },
       { path: "/login", element: <LoginPage /> },
+      
+      // Smart redirect based on role
       {
         path: "/dashboard",
         element: (
           <ProtectedRoute>
+            <DashboardRedirectPage />
+          </ProtectedRoute>
+        ),
+      },
+      
+      // Admin Routes
+      {
+        path: "/admin",
+        element: (
+          <ProtectedRoute requireRole={UserRole.ADMIN}>
+            <AdminDashboardLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          { path: "", element: <AdminDashboardPage /> }, // Default to dashboard
+          { path: "dashboard", element: <AdminDashboardPage /> },
+          { path: "users", element: <AdminUsersPage /> },
+          { path: "channels", element: <AdminChannelsPage /> },
+          { path: "rolling", element: <AdminRollingPage /> },
+          { path: "analytics", element: <AdminAnalyticsPage /> },
+          { path: "activity", element: <AdminActivityPage /> },
+          { path: "settings", element: <AdminSettingsPage /> },
+        ],
+      },
+
+      // Videaste Routes
+      {
+        path: "/videaste",
+        element: (
+          <ProtectedRoute requireRole={UserRole.VIDEASTE}>
             <DashboardLayout />
           </ProtectedRoute>
         ),
         children: [
-          { path: "", element: <DashboardPage /> },
+          { path: "", element: <VideasteDashboardPage /> },
+          { path: "dashboard", element: <VideasteDashboardPage /> },
+          { path: "videos", element: <DashboardPage /> }, // Placeholder - will create later
+          { path: "calendar", element: <DashboardPage /> }, // Placeholder - will create later
           { path: "add-channel", element: <AddChannelPage /> },
           { path: "roll-shorts", element: <RollShortsPage /> },
-          { path: "debug", element: <DebugPage /> },
         ],
       },
+
+      // Assistant Routes
+      {
+        path: "/assistant",
+        element: (
+          <ProtectedRoute requireRole={UserRole.ASSISTANT}>
+            <DashboardLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          { path: "", element: <AssistantDashboardPage /> },
+          { path: "dashboard", element: <AssistantDashboardPage /> },
+          { path: "videos", element: <DashboardPage /> }, // Placeholder - will create later
+          { path: "calendar", element: <DashboardPage /> }, // Placeholder - will create later
+        ],
+      },
+
       { path: "*", element: <NotFound /> },
     ],
   },
 ]);
 
 export const AppRouter = () => <RouterProvider router={router} />;
+
