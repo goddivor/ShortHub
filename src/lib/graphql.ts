@@ -336,6 +336,26 @@ export const DELETE_VIDEO_MUTATION = gql`
   }
 `;
 
+export const ADD_VIDEO_COMMENT_MUTATION = gql`
+  mutation AddVideoComment($videoId: ID!, $comment: String!) {
+    addVideoComment(videoId: $videoId, comment: $comment) {
+      id
+      author {
+        id
+        username
+      }
+      comment
+      createdAt
+    }
+  }
+`;
+
+export const DELETE_VIDEO_COMMENT_MUTATION = gql`
+  mutation DeleteVideoComment($id: ID!) {
+    deleteVideoComment(id: $id)
+  }
+`;
+
 // ============================================
 // CALENDAR
 // ============================================
