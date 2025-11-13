@@ -5,18 +5,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useToast } from '@/context/toast-context';
-import { 
-  ChannelService, 
-  ShortsService, 
-  type ChannelWithStats, 
-  type TagType,
-  formatSubscriberCount,
-  getTagColor,
-  getChannelTypeColor,
-  getTagOptions,
-  getTypeOptions
-} from '@/lib/supabase';
-import { getChannelShorts } from '@/lib/youtube-api';
+import { useChannels, formatSubscriberCount, getLanguageColor } from '@/hooks/useChannels';
+import { useVideos, useRollVideos, useUpdateVideoStatus } from '@/hooks/useVideos';
+import type { Channel, ChannelLanguage } from '@/types/graphql';
+import { VideoStatus } from '@/types/graphql';
 import Button from '@/components/Button';
 import SpinLoader from '@/components/SpinLoader';
 import { SearchInput } from '@/components/forms/search-input';
@@ -43,93 +35,115 @@ interface RolledVideo {
   channelId: string;
   videoUrl: string;
   isValidating: boolean;
+  videoId: string;
   rollId: string;
 }
 
-type SortField = 'username' | 'subscriber_count' | 'total_rolls' | 'validated_rolls' | 'pending_rolls' | 'tag' | 'type';
+interface ChannelWithVideoStats extends Channel {
+  totalVideos?: number;
+  validatedVideos?: number;
+  pendingVideos?: number;
+}
+
+type SortField = 'username' | 'subscriberCount' | 'totalVideos' | 'validatedVideos' | 'pendingVideos' | 'language';
 type SortDirection = 'asc' | 'desc';
 
 interface FilterState {
-  tag: string | null;
-  type: string | null;
+  language: string | null;
   search: string;
   hasActivity: boolean | null; // Filter for channels with/without activity
 }
 
+// Language options for the filter
+const getLanguageOptions = () => [
+  { value: 'FR', label: 'Français' },
+  { value: 'EN', label: 'Anglais' },
+  { value: 'ES', label: 'Espagnol' },
+  { value: 'DE', label: 'Allemand' },
+  { value: 'IT', label: 'Italien' },
+  { value: 'PT', label: 'Portugais' },
+  { value: 'AR', label: 'Arabe' },
+  { value: 'OTHER', label: 'Autre' }
+];
+
 const RollShortsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { success, error, info, warning } = useToast();
-  
+  const { success, error, info } = useToast();
+
+  // GraphQL hooks
+  const { channels: allChannels, loading: isLoading, refetch: refetchChannels } = useChannels();
+  const { videos: allVideos, refetch: refetchVideos } = useVideos();
+  const { rollVideos } = useRollVideos();
+  const { updateStatus } = useUpdateVideoStatus();
+
   // State management
-  const [channels, setChannels] = useState<ChannelWithStats[]>([]);
-  const [filteredChannels, setFilteredChannels] = useState<ChannelWithStats[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [channelsWithStats, setChannelsWithStats] = useState<ChannelWithVideoStats[]>([]);
+  const [filteredChannels, setFilteredChannels] = useState<ChannelWithVideoStats[]>([]);
   const [rollingStates, setRollingStates] = useState<Record<string, boolean>>({});
   const [rolledVideos, setRolledVideos] = useState<Record<string, RolledVideo[]>>({});
 
   // Filter and sort states
   const [filters, setFilters] = useState<FilterState>({
-    tag: null,
-    type: null,
+    language: null,
     search: '',
     hasActivity: null
   });
-  const [sortField, setSortField] = useState<SortField>('pending_rolls');
+  const [sortField, setSortField] = useState<SortField>('pendingVideos');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Load channels on component mount
+  // Calculate stats for channels when channels or videos change
   useEffect(() => {
-    loadChannels();
-  }, []);
+    if (!allChannels || !allVideos) {
+      setChannelsWithStats([]);
+      return;
+    }
+
+    const channelsWithStatsData: ChannelWithVideoStats[] = allChannels.map(channel => {
+      const channelVideos = allVideos.filter(v => v.sourceChannel.id === channel.id);
+      return {
+        ...channel,
+        totalVideos: channelVideos.length,
+        validatedVideos: channelVideos.filter(v => v.status === VideoStatus.VALIDATED).length,
+        pendingVideos: channelVideos.filter(v => v.status === VideoStatus.ROLLED).length
+      };
+    });
+
+    setChannelsWithStats(channelsWithStatsData);
+  }, [allChannels, allVideos]);
 
   // Apply filters and sorting when data or filters change
   useEffect(() => {
     applyFiltersAndSort();
-  }, [channels, filters, sortField, sortDirection]);
-
-  const loadChannels = async () => {
-    try {
-      setIsLoading(true);
-      const channelsData = await ChannelService.getChannelsWithStats();
-      setChannels(channelsData);
-      
-      // Load pending rolls for each channel
-      await loadPendingRolls(channelsData);
-    } catch (err) {
-      error('Erreur de chargement', 'Impossible de charger les chaînes');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [channelsWithStats, filters, sortField, sortDirection]);
 
   const applyFiltersAndSort = () => {
-    let filtered = [...channels];
+    if (!channelsWithStats) {
+      setFilteredChannels([]);
+      return;
+    }
+
+    let filtered = [...channelsWithStats];
 
     // Apply search filter
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
-      filtered = filtered.filter(channel => 
+      filtered = filtered.filter(channel =>
         channel.username.toLowerCase().includes(searchTerm) ||
-        channel.youtube_url.toLowerCase().includes(searchTerm) ||
-        (channel.domain && channel.domain.toLowerCase().includes(searchTerm))
+        channel.youtubeUrl.toLowerCase().includes(searchTerm) ||
+        (channel.channelId && channel.channelId.toLowerCase().includes(searchTerm))
       );
     }
 
-    // Apply tag filter
-    if (filters.tag) {
-      filtered = filtered.filter(channel => channel.tag === filters.tag);
-    }
-
-    // Apply type filter
-    if (filters.type) {
-      filtered = filtered.filter(channel => channel.type === filters.type);
+    // Apply language filter
+    if (filters.language) {
+      filtered = filtered.filter(channel => channel.language === filters.language);
     }
 
     // Apply activity filter
     if (filters.hasActivity !== null) {
       filtered = filtered.filter(channel => {
-        const hasActivity = channel.total_rolls > 0;
+        const hasActivity = (channel.totalVideos || 0) > 0;
         return filters.hasActivity ? hasActivity : !hasActivity;
       });
     }
@@ -140,7 +154,7 @@ const RollShortsPage: React.FC = () => {
       let bValue: any = b[sortField];
 
       // Handle different data types
-      if (['subscriber_count', 'total_rolls', 'validated_rolls', 'pending_rolls'].includes(sortField)) {
+      if (['subscriberCount', 'totalVideos', 'validatedVideos', 'pendingVideos'].includes(sortField)) {
         aValue = Number(aValue) || 0;
         bValue = Number(bValue) || 0;
       } else {
@@ -169,93 +183,47 @@ const RollShortsPage: React.FC = () => {
 
   const clearFilters = () => {
     setFilters({
-      tag: null,
-      type: null,
+      language: null,
       search: '',
       hasActivity: null
     });
   };
 
-  // OPTIMIZED: Load all pending rolls with a single query
-  const loadPendingRolls = async (channelsData: ChannelWithStats[]) => {
-    try {
-      // Get all unvalidated shorts in a single query
-      const shortsByChannel = await ShortsService.getUnvalidatedShortsByChannel();
-      
-      // Transform the data to match our component state structure
-      const newRolledVideos: Record<string, RolledVideo[]> = {};
-      
-      // Initialize empty arrays for all channels
-      for (const channel of channelsData) {
-        const channelShorts = shortsByChannel[channel.id] || [];
-        newRolledVideos[channel.id] = channelShorts.map(roll => ({
-          id: `${channel.id}-${roll.id}`,
-          channelId: channel.id,
-          videoUrl: roll.video_url,
-          isValidating: false,
-          rollId: roll.id
-        }));
-      }
-      
-      setRolledVideos(newRolledVideos);
-    } catch (err) {
-      console.error('Error loading pending rolls:', err);
-      error('Erreur de chargement', 'Impossible de charger les shorts en attente');
-    }
-  };
-
-  const handleRoll = async (channel: ChannelWithStats) => {
+  const handleRoll = async (channel: ChannelWithVideoStats) => {
     try {
       setRollingStates(prev => ({ ...prev, [channel.id]: true }));
       info('Génération en cours...', `Recherche d'un Short pour ${channel.username}`);
 
-      // Get channel's available shorts
-      const channelShorts = await getChannelShorts(channel.youtube_url);
-      
-      if (!channelShorts || channelShorts.length === 0) {
-        warning('Aucun Short trouvé', 'Cette chaîne ne semble pas avoir de YouTube Shorts disponibles');
-        return;
-      }
-
-      // Get already validated videos for this channel to avoid duplicates
-      const existingRolls = await ShortsService.getShortsRolls(channel.id);
-      const validatedUrls = existingRolls
-        .filter(roll => roll.validated)
-        .map(roll => roll.video_url);
-
-      // Filter out already validated videos
-      const availableShorts = channelShorts.filter(
-        shortUrl => !validatedUrls.includes(shortUrl)
-      );
-
-      if (availableShorts.length === 0) {
-        warning('Tous les Shorts traités', 'Tous les Shorts disponibles de cette chaîne ont déjà été validés');
-        return;
-      }
-
-      // Select a random short from available ones
-      const randomIndex = Math.floor(Math.random() * availableShorts.length);
-      const selectedShortUrl = availableShorts[randomIndex];
-
-      // Always create a new roll (even if the same video was rolled before but not validated)
-      const newRoll = await ShortsService.createShortsRoll({
-        channel_id: channel.id,
-        video_url: selectedShortUrl,
+      // Create a new video using GraphQL mutation
+      // The rollVideos mutation will automatically select a random Short from the channel
+      const newVideos = await rollVideos({
+        sourceChannelIds: [channel.id],
+        count: 1
       });
 
+      if (!newVideos || newVideos.length === 0) {
+        error('Erreur de création', 'Impossible de créer la vidéo');
+        return;
+      }
+
       // Add to local state
+      const createdVideo = newVideos[0];
       const newRolledVideo: RolledVideo = {
-        id: `${channel.id}-${newRoll.id}`,
+        id: `${channel.id}-${createdVideo.id}`,
         channelId: channel.id,
-        videoUrl: selectedShortUrl,
+        videoUrl: createdVideo.sourceVideoUrl,
         isValidating: false,
-        rollId: newRoll.id
+        videoId: createdVideo.id,
+        rollId: createdVideo.id
       };
 
       setRolledVideos(prev => ({
         ...prev,
         [channel.id]: [...(prev[channel.id] || []), newRolledVideo]
       }));
+
+      // Refresh videos list
+      await refetchVideos();
 
       success('Short généré !', 'Cliquez sur "Valider" ou "Ignorer" pour ce contenu');
       
@@ -278,7 +246,7 @@ const RollShortsPage: React.FC = () => {
     }
   };
 
-  const handleValidate = async (channel: ChannelWithStats, rolledVideo: RolledVideo) => {
+  const handleValidate = async (channel: ChannelWithVideoStats, rolledVideo: RolledVideo) => {
     try {
       // Set validating state for this specific video
       setRolledVideos(prev => ({
@@ -290,17 +258,21 @@ const RollShortsPage: React.FC = () => {
         )
       }));
 
-      await ShortsService.validateShortsRoll(rolledVideo.rollId);
+      await updateStatus({
+        videoId: rolledVideo.rollId,
+        status: VideoStatus.VALIDATED
+      });
       success('Short validé !', 'Cette vidéo ne sera plus proposée');
-      
+
       // Remove from rolled videos
       setRolledVideos(prev => ({
         ...prev,
         [channel.id]: prev[channel.id].filter(video => video.id !== rolledVideo.id)
       }));
 
-      // Refresh channel stats
-      loadChannels();
+      // Refresh data
+      await refetchVideos();
+      await refetchChannels();
       
     } catch (err) {
       error('Erreur de validation', 'Impossible de valider cette vidéo');
@@ -317,7 +289,7 @@ const RollShortsPage: React.FC = () => {
     }
   };
 
-  const handleIgnore = async (channel: ChannelWithStats, rolledVideo: RolledVideo) => {
+  const handleIgnore = async (channel: ChannelWithVideoStats, rolledVideo: RolledVideo) => {
     try {
       // Set validating state for this specific video (reuse the same state)
       setRolledVideos(prev => ({
@@ -329,18 +301,22 @@ const RollShortsPage: React.FC = () => {
         )
       }));
 
-      // Delete the roll from database without validating
-      await ShortsService.deleteShortsRoll(rolledVideo.rollId);
-      info('Short ignoré', 'Cette vidéo pourra être générée à nouveau');
-      
+      // Update video status to REJECTED (or we could delete it)
+      await updateStatus({
+        videoId: rolledVideo.rollId,
+        status: VideoStatus.REJECTED
+      });
+      info('Short ignoré', 'Cette vidéo a été marquée comme rejetée');
+
       // Remove from rolled videos
       setRolledVideos(prev => ({
         ...prev,
         [channel.id]: prev[channel.id].filter(video => video.id !== rolledVideo.id)
       }));
 
-      // Refresh channel stats
-      loadChannels();
+      // Refresh data
+      await refetchVideos();
+      await refetchChannels();
       
     } catch (err) {
       error('Erreur', 'Impossible d\'ignorer cette vidéo');
@@ -384,9 +360,9 @@ const RollShortsPage: React.FC = () => {
   };
 
   // Calculate total stats
-  const totalValidated = filteredChannels.reduce((sum, ch) => sum + ch.validated_rolls, 0);
-  const totalPending = filteredChannels.reduce((sum, ch) => sum + ch.pending_rolls, 0);
-  const totalSubscribers = filteredChannels.reduce((sum, ch) => sum + ch.subscriber_count, 0);
+  const totalValidated = filteredChannels.reduce((sum, ch) => sum + (ch.validatedVideos || 0), 0);
+  const totalPending = filteredChannels.reduce((sum, ch) => sum + (ch.pendingVideos || 0), 0);
+  const totalSubscribers = filteredChannels.reduce((sum, ch) => sum + (ch.subscriberCount || 0), 0);
 
   if (isLoading) {
     return (
@@ -491,7 +467,7 @@ const RollShortsPage: React.FC = () => {
                 Filtres
               </Button>
               
-              {(filters.tag || filters.type || filters.search || filters.hasActivity !== null) && (
+              {(filters.language || filters.search || filters.hasActivity !== null) && (
                 <Button
                   onClick={clearFilters}
                   className="px-4 py-2 text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
@@ -508,24 +484,14 @@ const RollShortsPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
               <div>
                 <CustomSelect
-                  label="Filtrer par tag"
-                  options={[{ value: '', label: 'Tous les tags' }, ...getTagOptions()]}
-                  value={filters.tag || ''}
-                  onChange={(value) => setFilters(prev => ({ ...prev, tag: value || null }))}
-                  placeholder="Sélectionner un tag"
+                  label="Filtrer par langue"
+                  options={[{ value: '', label: 'Toutes les langues' }, ...getLanguageOptions()]}
+                  value={filters.language || ''}
+                  onChange={(value) => setFilters(prev => ({ ...prev, language: value || null }))}
+                  placeholder="Sélectionner une langue"
                 />
               </div>
-              
-              <div>
-                <CustomSelect
-                  label="Filtrer par type"
-                  options={[{ value: '', label: 'Tous les types' }, ...getTypeOptions()]}
-                  value={filters.type || ''}
-                  onChange={(value) => setFilters(prev => ({ ...prev, type: value || null }))}
-                  placeholder="Sélectionner un type"
-                />
-              </div>
-              
+
               <div>
                 <CustomSelect
                   label="Activité"
@@ -548,7 +514,7 @@ const RollShortsPage: React.FC = () => {
           {/* Sort Options */}
           <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-gray-200">
             <span className="text-sm font-medium text-gray-700">Trier par:</span>
-            
+
             <Button
               onClick={() => handleSort('username')}
               className={getSortButtonClass('username')}
@@ -556,53 +522,45 @@ const RollShortsPage: React.FC = () => {
               <span>Nom</span>
               {renderSortIcon('username')}
             </Button>
-            
+
             <Button
-              onClick={() => handleSort('subscriber_count')}
-              className={getSortButtonClass('subscriber_count')}
+              onClick={() => handleSort('subscriberCount')}
+              className={getSortButtonClass('subscriberCount')}
             >
               <span>Abonnés</span>
-              {renderSortIcon('subscriber_count')}
+              {renderSortIcon('subscriberCount')}
             </Button>
-            
+
             <Button
-              onClick={() => handleSort('pending_rolls')}
-              className={getSortButtonClass('pending_rolls')}
+              onClick={() => handleSort('pendingVideos')}
+              className={getSortButtonClass('pendingVideos')}
             >
               <span>En attente</span>
-              {renderSortIcon('pending_rolls')}
+              {renderSortIcon('pendingVideos')}
             </Button>
-            
+
             <Button
-              onClick={() => handleSort('validated_rolls')}
-              className={getSortButtonClass('validated_rolls')}
+              onClick={() => handleSort('validatedVideos')}
+              className={getSortButtonClass('validatedVideos')}
             >
               <span>Validés</span>
-              {renderSortIcon('validated_rolls')}
+              {renderSortIcon('validatedVideos')}
             </Button>
-            
+
             <Button
-              onClick={() => handleSort('total_rolls')}
-              className={getSortButtonClass('total_rolls')}
+              onClick={() => handleSort('totalVideos')}
+              className={getSortButtonClass('totalVideos')}
             >
-              <span>Total rolls</span>
-              {renderSortIcon('total_rolls')}
+              <span>Total videos</span>
+              {renderSortIcon('totalVideos')}
             </Button>
-            
+
             <Button
-              onClick={() => handleSort('tag')}
-              className={getSortButtonClass('tag')}
+              onClick={() => handleSort('language')}
+              className={getSortButtonClass('language')}
             >
-              <span>Tag</span>
-              {renderSortIcon('tag')}
-            </Button>
-            
-            <Button
-              onClick={() => handleSort('type')}
-              className={getSortButtonClass('type')}
-            >
-              <span>Type</span>
-              {renderSortIcon('type')}
+              <span>Langue</span>
+              {renderSortIcon('language')}
             </Button>
           </div>
         </div>
@@ -612,11 +570,11 @@ const RollShortsPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
           {filteredChannels.length} chaîne{filteredChannels.length > 1 ? 's' : ''} trouvée{filteredChannels.length > 1 ? 's' : ''}
-          {channels.length !== filteredChannels.length && ` sur ${channels.length} au total`}
+          {channelsWithStats.length !== filteredChannels.length && ` sur ${channelsWithStats.length} au total`}
         </p>
-        
+
         <Button
-          onClick={loadChannels}
+          onClick={() => refetchChannels()}
           className="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-50 transition-colors"
           title="Actualiser"
         >
@@ -627,7 +585,7 @@ const RollShortsPage: React.FC = () => {
       {/* Channels Grid */}
       {filteredChannels.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          {channels.length === 0 ? (
+          {!allChannels || allChannels.length === 0 ? (
             // No channels at all
             <>
               <VideoPlay color="#9CA3AF" size={64} className="text-gray-400 mx-auto mb-4" />
@@ -685,14 +643,14 @@ const RollShortsPage: React.FC = () => {
                       </h3>
                       <div className="flex items-center gap-1 text-sm text-gray-600">
                         <TrendUp color="#6B7280" size={14} className="text-gray-500" />
-                        <span>{formatSubscriberCount(channel.subscriber_count)} abonnés</span>
+                        <span>{formatSubscriberCount(channel.subscriberCount || 0)} abonnés</span>
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Channel Link */}
                   <Button
-                    onClick={() => openVideoInNewTab(channel.youtube_url)}
+                    onClick={() => openVideoInNewTab(channel.youtubeUrl)}
                     className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0"
                     title="Voir la chaîne YouTube"
                   >
@@ -702,15 +660,12 @@ const RollShortsPage: React.FC = () => {
 
                 {/* Channel Tags */}
                 <div className="flex items-center gap-2 mb-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getTagColor(channel.tag)}`}>
-                    {channel.tag}
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getLanguageColor(channel.language)}`}>
+                    {channel.language}
                   </span>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getChannelTypeColor(channel.type)}`}>
-                    {channel.type}
-                  </span>
-                  {channel.domain && (
-                    <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
-                      {channel.domain}
+                  {channel.channelId && (
+                    <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium font-mono">
+                      {channel.channelId.substring(0, 8)}...
                     </span>
                   )}
                 </div>
@@ -719,15 +674,15 @@ const RollShortsPage: React.FC = () => {
                 <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
                   <div className="text-center">
                     <p className="text-sm text-gray-600">Total</p>
-                    <p className="font-semibold text-gray-900">{channel.total_rolls}</p>
+                    <p className="font-semibold text-gray-900">{channel.totalVideos || 0}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-sm text-gray-600">Validés</p>
-                    <p className="font-semibold text-green-600">{channel.validated_rolls}</p>
+                    <p className="font-semibold text-green-600">{channel.validatedVideos || 0}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-sm text-gray-600">En attente</p>
-                    <p className="font-semibold text-yellow-600">{channel.pending_rolls}</p>
+                    <p className="font-semibold text-yellow-600">{channel.pendingVideos || 0}</p>
                   </div>
                 </div>
 
@@ -835,34 +790,34 @@ const RollShortsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tag Distribution (only show if there are channels) */}
-      {channels.length > 0 && (
+      {/* Language Distribution (only show if there are channels) */}
+      {allChannels && allChannels.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Tag</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Langue</h3>
           <div className="flex flex-wrap gap-3">
-            {getTagOptions().map(tag => {
-              const count = channels.filter(ch => ch.tag === tag.value).length;
-              const filteredCount = filteredChannels.filter(ch => ch.tag === tag.value).length;
-              
+            {getLanguageOptions().map(lang => {
+              const count = allChannels.filter(ch => ch.language === lang.value).length;
+              const filteredCount = filteredChannels.filter(ch => ch.language === lang.value).length;
+
               if (count === 0) return null;
-              
+
               return (
-                <div key={tag.value} className="flex items-center gap-2">
+                <div key={lang.value} className="flex items-center gap-2">
                   <button
-                    onClick={() => setFilters(prev => ({ 
-                      ...prev, 
-                      tag: prev.tag === tag.value ? null : tag.value 
+                    onClick={() => setFilters(prev => ({
+                      ...prev,
+                      language: prev.language === lang.value ? null : lang.value
                     }))}
                     className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                      filters.tag === tag.value
-                        ? getTagColor(tag.value as TagType)
-                        : `${getTagColor(tag.value as TagType)} opacity-60 hover:opacity-100`
+                      filters.language === lang.value
+                        ? getLanguageColor(lang.value as ChannelLanguage)
+                        : `${getLanguageColor(lang.value as ChannelLanguage)} opacity-60 hover:opacity-100`
                     }`}
                   >
-                    {tag.value}
+                    {lang.label}
                   </button>
                   <span className="text-sm text-gray-600">
-                    ({filters.tag ? filteredCount : count})
+                    ({filters.language ? filteredCount : count})
                   </span>
                 </div>
               );
@@ -893,7 +848,7 @@ const RollShortsPage: React.FC = () => {
             <div className="text-center">
               <div className="mb-2">
                 <span className="text-2xl font-bold text-blue-600">
-                  {filteredChannels.filter(ch => ch.total_rolls > 0).length}
+                  {filteredChannels.filter(ch => (ch.totalVideos || 0) > 0).length}
                 </span>
               </div>
               <p className="text-sm text-gray-600">Chaînes actives</p>

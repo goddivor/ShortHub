@@ -10,7 +10,7 @@ import { useToast } from '@/context/toast-context';
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login, isAuthenticated, loading: authLoading } = useAuth();
-  const { showToast } = useToast();
+  const { success, error: showError } = useToast();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +28,7 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
 
     if (!username || !password) {
-      showToast('Veuillez remplir tous les champs', 'error');
+      showError('Veuillez remplir tous les champs');
       return;
     }
 
@@ -36,20 +36,20 @@ const LoginPage: React.FC = () => {
 
     try {
       await login(username, password);
-      showToast('Connexion réussie !', 'success');
+      success('Connexion réussie !');
       navigate('/dashboard');
-    } catch (error: any) {
-      console.error('Login error:', error);
+    } catch (err: unknown) {
+      console.error('Login error:', err);
 
       // Handle different error types
-      const errorMessage = error.message || 'Identifiants incorrects';
+      const errorMessage = err instanceof Error ? err.message : 'Identifiants incorrects';
 
       if (errorMessage.includes('credentials')) {
-        showToast('Nom d\'utilisateur ou mot de passe incorrect', 'error');
+        showError('Nom d\'utilisateur ou mot de passe incorrect');
       } else if (errorMessage.includes('blocked')) {
-        showToast('Votre compte a été bloqué. Contactez l\'administrateur.', 'error');
+        showError('Votre compte a été bloqué. Contactez l\'administrateur.');
       } else {
-        showToast('Erreur de connexion. Veuillez réessayer.', 'error');
+        showError('Erreur de connexion. Veuillez réessayer.');
       }
     } finally {
       setIsLoading(false);
@@ -122,7 +122,7 @@ const LoginPage: React.FC = () => {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <UserIcon size={20} className="text-gray-400" />
+                  <UserIcon size={20} color="#3B82F6" variant="Bold" />
                 </div>
                 <input
                   id="username"
@@ -133,7 +133,7 @@ const LoginPage: React.FC = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                  placeholder="admin"
+                  placeholder="Entrez votre nom d'utilisateur"
                   disabled={isLoading}
                 />
               </div>
@@ -146,7 +146,7 @@ const LoginPage: React.FC = () => {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock size={20} className="text-gray-400" />
+                  <Lock size={20} color="#EF4444" variant="Bold" />
                 </div>
                 <input
                   id="password"
@@ -157,26 +157,26 @@ const LoginPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                  placeholder="••••••••"
+                  placeholder="Entrez votre mot de passe"
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center hover:opacity-80 transition-opacity"
                   disabled={isLoading}
                 >
                   {showPassword ? (
-                    <EyeSlash size={20} className="text-gray-400 hover:text-gray-600" />
+                    <EyeSlash size={20} color="#9CA3AF" variant="Bold" />
                   ) : (
-                    <Eye size={20} className="text-gray-400 hover:text-gray-600" />
+                    <Eye size={20} color="#9CA3AF" variant="Bold" />
                   )}
                 </button>
               </div>
             </div>
 
             {/* Submit Button */}
-            <div className="pt-2">
+            <div className="pt-4">
               <Button
                 type="submit"
                 disabled={isLoading || !username || !password}
@@ -200,33 +200,6 @@ const LoginPage: React.FC = () => {
               </Button>
             </div>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="pt-4 border-t border-gray-200">
-            <p className="text-xs text-gray-500 text-center mb-3">
-              Comptes de démonstration :
-            </p>
-            <div className="grid grid-cols-1 gap-2 text-xs">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="font-semibold text-gray-700 mb-1">👑 Admin</p>
-                <p className="text-gray-600">
-                  <span className="font-mono">admin</span> / <span className="font-mono">admin123</span>
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="font-semibold text-gray-700 mb-1">🎬 Vidéaste</p>
-                <p className="text-gray-600">
-                  <span className="font-mono">videaste1</span> / <span className="font-mono">videaste123</span>
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="font-semibold text-gray-700 mb-1">🤝 Assistant</p>
-                <p className="text-gray-600">
-                  <span className="font-mono">assistant1</span> / <span className="font-mono">assistant123</span>
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}

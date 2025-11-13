@@ -3,16 +3,15 @@ import React from 'react';
 import { useNavigate } from 'react-router';
 import Button from '@/components/Button';
 import Logo from '@/components/ui/logo';
-import { 
-  Youtube, 
-  VideoPlay, 
-  TrendUp, 
-  User, 
-  Play, 
+import {
+  Youtube,
+  VideoPlay,
+  TrendUp,
+  User,
+  Play,
   TickCircle,
   Chart,
   Timer,
-  Setting,
   Crown
 } from 'iconsax-react';
 
@@ -36,9 +35,9 @@ const LandingPage: React.FC = () => {
       description: "Suivez vos statistiques de validation et optimisez votre flux de travail."
     },
     {
-      icon: <Setting color="#8B5CF6" size={32} className="text-purple-600" />,
-      title: "Configuration Flexible",
-      description: "Organisez vos chaînes par tags (VF, VOSTFR, VA, VOSTA) et domaines spécifiques."
+      icon: <Youtube color="#8B5CF6" size={32} className="text-purple-600" />,
+      title: "Gestion Multi-Chaînes",
+      description: "Organisez vos chaînes par langue (FR, EN, ES...) et suivez les statistiques de chacune."
     }
   ];
 
@@ -258,13 +257,13 @@ const LandingPage: React.FC = () => {
                 <User color="white" size={24} className="text-white mr-2" />
                 Ajouter ma Première Chaîne
               </Button>
-              
+
               <Button
-                onClick={() => navigate('dashboard/debug')}
+                onClick={() => navigate('dashboard/roll-shorts')}
                 className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-4 text-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
               >
-                <Setting color="white" size={24} className="text-white mr-2" />
-                Tester la Configuration
+                <VideoPlay color="white" size={24} className="text-white mr-2" />
+                Générer des Shorts
               </Button>
             </div>
           </div>
@@ -286,9 +285,6 @@ const LandingPage: React.FC = () => {
               </a>
               <a href="dashboard/roll-shorts" className="text-gray-400 hover:text-white transition-colors">
                 Générer Shorts
-              </a>
-              <a href="dashboard/debug" className="text-gray-400 hover:text-white transition-colors">
-                Debug
               </a>
             </div>
           </div>

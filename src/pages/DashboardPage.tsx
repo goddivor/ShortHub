@@ -1,94 +1,42 @@
 // src/pages/DashboardPage.tsx
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router';
-import { ChannelService, ShortsService, type Channel } from '@/lib/supabase';
+import { useDashboardAnalytics } from '@/hooks/useAnalytics';
+import { useNotifications } from '@/hooks/useNotifications';
+import { formatSubscriberCount } from '@/hooks/useChannels';
 import Button from '@/components/Button';
 import SpinLoader from '@/components/SpinLoader';
-import { 
-  Youtube, 
-  VideoPlay, 
-  User, 
-  TrendUp, 
-  Chart, 
-  Add, 
+import {
+  Youtube,
+  VideoPlay,
+  TrendUp,
+  Add,
   Play,
   TickCircle,
   Timer,
   Crown,
   ArrowRight,
-  Refresh
+  Refresh,
+  Chart,
+  Notification,
+  Video,
+  CloseCircle
 } from 'iconsax-react';
-
-interface DashboardStats {
-  totalChannels: number;
-  totalShortsRolled: number;
-  validatedShorts: number;
-  pendingShorts: number;
-  totalSubscribers: number;
-}
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalChannels: 0,
-    totalShortsRolled: 0,
-    validatedShorts: 0,
-    pendingShorts: 0,
-    totalSubscribers: 0
+  const { analytics, loading: isLoading, refetch } = useDashboardAnalytics();
+  const { notifications, loading: notificationsLoading } = useNotifications({
+    first: 5,
+    unreadOnly: false,
   });
-  const [recentChannels, setRecentChannels] = useState<Channel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Load channels
-      const channels = await ChannelService.getChannels();
-      
-      // Load shorts data
-      const shorts = await ShortsService.getShortsRolls();
-      
-      // Calculate stats
-      const totalSubscribers = channels.reduce((sum, ch) => sum + ch.subscriber_count, 0);
-      const validatedShorts = shorts.filter(s => s.validated).length;
-      const pendingShorts = shorts.filter(s => !s.validated).length;
-      
-      setStats({
-        totalChannels: channels.length,
-        totalShortsRolled: shorts.length,
-        validatedShorts,
-        pendingShorts,
-        totalSubscribers
-      });
-      
-      // Get 5 most recent channels
-      setRecentChannels(channels.slice(0, 5));
-      
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const formatNumber = (num: number): string => {
-    if (num >= 1000000) {
-      return `${(num / 1000000).toFixed(1)}M`;
-    } else if (num >= 1000) {
-      return `${(num / 1000).toFixed(1)}K`;
-    }
-    return num.toString();
-  };
 
   const statsCards = [
     {
       title: 'Chaînes Totales',
-      value: stats.totalChannels,
+      value: analytics?.totalChannels || 0,
       icon: <Youtube color="#FF0000" size={24} className="text-red-600" />,
       color: 'red',
       bgColor: 'bg-red-50',
@@ -96,7 +44,7 @@ const DashboardPage: React.FC = () => {
     },
     {
       title: 'Shorts Validés',
-      value: stats.validatedShorts,
+      value: analytics?.videosValidated || 0,
       icon: <TickCircle color="#10B981" size={24} className="text-green-600" />,
       color: 'green',
       bgColor: 'bg-green-50',
@@ -104,15 +52,15 @@ const DashboardPage: React.FC = () => {
     },
     {
       title: 'En Attente',
-      value: stats.pendingShorts,
+      value: analytics?.videosRolled || 0,
       icon: <Timer color="#F59E0B" size={24} className="text-yellow-600" />,
       color: 'yellow',
       bgColor: 'bg-yellow-50',
-      textColor: 'text-yellow-600'
+      textColor: 'text-yellow-50'
     },
     {
       title: 'Abonnés Cumulés',
-      value: formatNumber(stats.totalSubscribers),
+      value: formatSubscriberCount(analytics?.totalSubscribers || 0),
       icon: <TrendUp color="#8B5CF6" size={24} className="text-purple-600" />,
       color: 'purple',
       bgColor: 'bg-purple-50',
@@ -168,14 +116,27 @@ const DashboardPage: React.FC = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statsCards.map((stat, index) => (
-          <div key={index} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+          <div
+            key={index}
+            className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group cursor-pointer"
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">{stat.title}</p>
-                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600 mb-2">{stat.title}</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:scale-110 transition-transform duration-300">
+                  {stat.value}
+                </p>
               </div>
-              <div className={`p-3 rounded-lg ${stat.bgColor}`}>
+              <div className={`p-3 rounded-xl ${stat.bgColor} group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 shadow-sm`}>
                 {stat.icon}
+              </div>
+            </div>
+            {/* Progress indicator or sparkline could go here */}
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <div className={`w-2 h-2 rounded-full ${stat.bgColor.replace('bg-', 'bg-')}`}></div>
+                <span className="group-hover:text-gray-700 transition-colors">Voir détails</span>
               </div>
             </div>
           </div>
@@ -185,101 +146,164 @@ const DashboardPage: React.FC = () => {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {quickActions.map((action, index) => (
-          <div key={index} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+          <div
+            key={index}
+            className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group cursor-pointer"
+            onClick={() => navigate(action.path)}
+          >
             <div className="flex items-start justify-between mb-4">
-              <div className="bg-gray-50 rounded-lg p-3">
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 group-hover:scale-110 transition-transform duration-300 shadow-sm">
                 {action.icon}
               </div>
-              <ArrowRight color="#6B7280" size={20} className="text-gray-400" />
+              <ArrowRight
+                color={action.color === 'red' ? '#EF4444' : '#10B981'}
+                size={24}
+                className="group-hover:translate-x-1 transition-transform duration-300"
+                variant="Bold"
+              />
             </div>
-            
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{action.title}</h3>
-            <p className="text-gray-600 mb-4">{action.description}</p>
-            
-            <Button
-              onClick={() => navigate(action.path)}
+
+            <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-red-600 group-hover:to-orange-600 transition-all">
+              {action.title}
+            </h3>
+            <p className="text-gray-600 mb-6 leading-relaxed">{action.description}</p>
+
+            <div
               className={`
-                w-full py-3 px-4 font-medium rounded-lg transition-all flex items-center justify-center gap-2
-                ${action.color === 'red' 
-                  ? 'bg-red-600 hover:bg-red-700 text-white' 
-                  : 'bg-green-600 hover:bg-green-700 text-white'
+                w-full py-3 px-4 font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-md group-hover:shadow-lg
+                ${action.color === 'red'
+                  ? 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white'
+                  : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white'
                 }
               `}
             >
-              Commencer
-            </Button>
+              <span>Commencer</span>
+              <ArrowRight size={18} variant="Bold" />
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Recent Channels */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Chaînes Récentes</h2>
-            <Button
-              onClick={() => navigate('/dashboard/add-channel')}
-              className="text-red-600 hover:text-red-700 text-sm font-medium"
-            >
-              Voir toutes
-            </Button>
-          </div>
-        </div>
-        
-        <div className="p-6">
-          {recentChannels.length === 0 ? (
-            <div className="text-center py-12">
-              <Youtube color="#9CA3AF" size={48} className="text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune chaîne enregistrée</h3>
-              <p className="text-gray-600 mb-4">Commencez par ajouter votre première chaîne YouTube</p>
+      {/* Recent Activity & Notifications */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Notifications récentes */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-indigo-100 rounded-lg p-2">
+                  <Notification size={20} color="#6366F1" variant="Bold" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900">Notifications Récentes</h2>
+              </div>
               <Button
-                onClick={() => navigate('/dashboard/add-channel')}
-                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 font-medium rounded-lg"
+                onClick={() => navigate('/dashboard/notifications')}
+                className="text-indigo-600 hover:text-indigo-700 text-sm font-medium"
               >
-                Ajouter une chaîne
+                Tout voir
               </Button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {recentChannels.map((channel) => (
-                <div key={channel.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-red-100 rounded-full p-2">
-                      <User color="#FF0000" size={16} className="text-red-600" />
+          </div>
+
+          <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+            {notificationsLoading ? (
+              <div className="p-6 text-center">
+                <SpinLoader />
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="p-8 text-center">
+                <Notification size={48} color="#9CA3AF" className="mx-auto mb-3" variant="Bulk" />
+                <p className="text-gray-500">Aucune notification</p>
+              </div>
+            ) : (
+              notifications.slice(0, 5).map((notif) => (
+                <div key={notif.id} className={`p-4 hover:bg-gray-50 transition-colors ${!notif.read ? 'bg-indigo-50/30' : ''}`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`w-2 h-2 rounded-full mt-2 ${!notif.read ? 'bg-indigo-600' : 'bg-gray-300'}`}></div>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-700">{notif.message}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {format(new Date(notif.createdAt), 'PPp', { locale: fr })}
+                      </p>
                     </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">{channel.username}</h4>
-                      <p className="text-sm text-gray-600">{formatNumber(channel.subscriber_count)} abonnés</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <span className={`
-                      px-2 py-1 rounded text-xs font-medium
-                      ${channel.tag === 'VF' ? 'bg-red-100 text-red-800' :
-                        channel.tag === 'VOSTFR' ? 'bg-blue-100 text-blue-800' :
-                        channel.tag === 'VA' ? 'bg-yellow-100 text-yellow-800' :
-                        channel.tag === 'VOSTA' ? 'bg-purple-100 text-purple-800' :
-                        'bg-green-100 text-green-800'
-                      }
-                    `}>
-                      {channel.tag}
-                    </span>
-                    
-                    <span className={`
-                      px-2 py-1 rounded text-xs font-medium
-                      ${channel.type === 'Mix' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-green-100 text-green-800'
-                      }
-                    `}>
-                      {channel.type}
-                    </span>
                   </div>
                 </div>
-              ))}
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Performance Overview */}
+        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl shadow-sm border border-purple-200 overflow-hidden">
+          <div className="p-6 border-b border-purple-200">
+            <div className="flex items-center gap-3">
+              <div className="bg-purple-600 rounded-lg p-2">
+                <Chart size={20} color="white" variant="Bold" />
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900">Aperçu Performance</h2>
             </div>
-          )}
+          </div>
+
+          <div className="p-6 space-y-4">
+            {/* Completion Rate */}
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">Taux de complétion</span>
+                <span className="text-lg font-bold text-purple-600">
+                  {analytics?.completionRate ? `${analytics.completionRate.toFixed(1)}%` : '0%'}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-gradient-to-r from-purple-500 to-indigo-600 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${analytics?.completionRate || 0}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Average Completion Time */}
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Temps moyen</span>
+                <div className="flex items-center gap-2">
+                  <Timer size={16} color="#6366F1" variant="Bold" />
+                  <span className="text-lg font-bold text-indigo-600">
+                    {analytics?.averageCompletionTime
+                      ? `${Math.round(analytics.averageCompletionTime / 60)} min`
+                      : 'N/A'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Videos Statistics */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <Video size={14} color="#10B981" variant="Bold" />
+                  <span className="text-xs font-medium text-gray-600">Complétées</span>
+                </div>
+                <span className="text-xl font-bold text-green-600">{analytics?.videosCompleted || 0}</span>
+              </div>
+
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <CloseCircle size={14} color="#EF4444" variant="Bold" />
+                  <span className="text-xs font-medium text-gray-600">En retard</span>
+                </div>
+                <span className="text-xl font-bold text-red-600">{analytics?.videosLate || 0}</span>
+              </div>
+            </div>
+
+            {/* Action Button */}
+            <Button
+              onClick={() => navigate('/dashboard/analytics')}
+              className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-3 px-4 rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+            >
+              <Chart size={18} variant="Bold" />
+              Voir Analytics Détaillées
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -288,21 +312,21 @@ const DashboardPage: React.FC = () => {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Activité Récente</h3>
           <div className="space-y-3">
-            {stats.totalChannels === 0 ? (
+            {!analytics || analytics.totalChannels === 0 ? (
               <p className="text-gray-500 text-center py-4">Aucune activité récente</p>
             ) : (
               <>
                 <div className="flex items-center gap-3 text-sm">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-600">{stats.validatedShorts} shorts validés</span>
+                  <span className="text-gray-600">{analytics.videosValidated} shorts validés</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                  <span className="text-gray-600">{stats.pendingShorts} shorts en attente</span>
+                  <span className="text-gray-600">{analytics.videosRolled} shorts en attente</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="text-gray-600">{stats.totalChannels} chaînes enregistrées</span>
+                  <span className="text-gray-600">{analytics.totalChannels} chaînes enregistrées</span>
                 </div>
               </>
             )}
@@ -313,7 +337,7 @@ const DashboardPage: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Actions Rapides</h3>
             <Button
-              onClick={loadDashboardData}
+              onClick={() => refetch()}
               className="text-gray-500 hover:text-gray-700 p-2"
               title="Actualiser"
             >
@@ -342,17 +366,6 @@ const DashboardPage: React.FC = () => {
                 <span className="text-blue-900 font-medium">Nouvelle chaîne</span>
               </div>
               <ArrowRight color="#3B82F6" size={16} className="text-blue-600" />
-            </Button>
-            
-            <Button
-              onClick={() => navigate('/dashboard/debug')}
-              className="w-full flex items-center justify-between p-3 text-left bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200"
-            >
-              <div className="flex items-center gap-2">
-                <Chart color="#6B7280" size={16} className="text-gray-600" />
-                <span className="text-gray-900 font-medium">Vérifier config</span>
-              </div>
-              <ArrowRight color="#6B7280" size={16} className="text-gray-600" />
             </Button>
           </div>
         </div>
