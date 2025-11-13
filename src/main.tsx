@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client";
-import { ApolloProvider } from "@apollo/client";
+import { ApolloProvider } from "@apollo/client/react";
 import "./index.css";
 import { AppRouter } from "./pages";
 import { ToastProvider } from "./context/toast-context";
