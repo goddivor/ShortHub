@@ -5,9 +5,17 @@ import { getMainDefinition } from '@apollo/client/utilities';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import { createClient } from 'graphql-ws';
+import type { GraphQLError } from 'graphql';
 
 const GRAPHQL_ENDPOINT = import.meta.env.VITE_GRAPHQL_ENDPOINT || 'http://localhost:4000/graphql';
 const WS_ENDPOINT = import.meta.env.VITE_WS_ENDPOINT || 'ws://localhost:4000/graphql';
+
+// Navigation callback for error handling
+let navigationCallback: ((path: string) => void) | null = null;
+
+export const setNavigationCallback = (callback: (path: string) => void) => {
+  navigationCallback = callback;
+};
 
 // HTTP Link for queries and mutations
 const httpLink = new HttpLink({
@@ -39,9 +47,13 @@ const authLink = setContext((_, { headers }) => {
 });
 
 // Error Link to handle authentication errors
-const errorLink = onError(({ graphQLErrors, networkError }) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const errorLink = onError((errorResponse: any) => {
+  const { graphQLErrors, networkError } = errorResponse;
+
   if (graphQLErrors) {
-    graphQLErrors.forEach(({ message, locations, path, extensions }) => {
+    graphQLErrors.forEach((error: GraphQLError) => {
+      const { message, locations, path, extensions } = error;
       console.error(
         `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`
       );
@@ -52,7 +64,13 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+
+        // Use navigation callback if available, otherwise fallback to window.location
+        if (navigationCallback) {
+          navigationCallback('/login');
+        } else {
+          window.location.href = '/login';
+        }
       }
     });
   }
