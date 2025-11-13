@@ -1,5 +1,6 @@
 // src/context/auth-context.tsx
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { LOGIN_MUTATION, ME_QUERY } from '@/lib/graphql';
 import { setAuthToken, setRefreshToken, clearAuthTokens, isAuthenticated } from '@/lib/apollo-client';
@@ -14,7 +15,7 @@ interface AuthContextType {
   refetchUser: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -25,15 +26,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isInitializing, setIsInitializing] = useState(true);
 
   // Query to get current user
-  const { data: meData, loading: meLoading, refetch: refetchMe } = useQuery(ME_QUERY, {
+  const { loading: meLoading, refetch: refetchMe } = useQuery<{ me: User }>(ME_QUERY, {
     skip: !isAuthenticated(),
-    onCompleted: (data) => {
+    onCompleted: (data: { me: User }) => {
       if (data?.me) {
         setUser(data.me);
         localStorage.setItem('user', JSON.stringify(data.me));
       }
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Failed to fetch user:', error);
       handleLogout();
     },
@@ -110,32 +111,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-// Hook for protected routes
-export const useRequireAuth = (allowedRoles?: string[]) => {
-  const { user, isAuthenticated: authenticated, loading } = useAuth();
-
-  useEffect(() => {
-    if (!loading && !authenticated) {
-      window.location.href = '/login';
-    }
-
-    if (!loading && authenticated && user && allowedRoles) {
-      if (!allowedRoles.includes(user.role)) {
-        // Redirect to dashboard if user doesn't have required role
-        window.location.href = '/dashboard';
-      }
-    }
-  }, [loading, authenticated, user, allowedRoles]);
-
-  return { user, loading };
 };

@@ -1,7 +1,7 @@
 // src/components/ProtectedRoute.tsx
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { useAuth } from '@/context/auth-context';
+import { useAuth } from '@/hooks/useAuth';
 import SpinLoader from './SpinLoader';
 import { UserRole } from '@/types/graphql';
 

@@ -3,7 +3,7 @@ import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router';
 import Logo from '@/components/ui/logo';
 import Button from '@/components/Button';
-import { useAuth } from '@/context/auth-context';
+import { useAuth } from '@/hooks/useAuth';
 import {
   Home,
   User,

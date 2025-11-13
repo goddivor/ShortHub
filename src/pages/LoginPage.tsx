@@ -1,9 +1,8 @@
 // src/pages/LoginPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { useAuth } from '@/context/auth-context';
+import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/Button';
-import Input from '@/components/Input';
 import SpinLoader from '@/components/SpinLoader';
 import { Lock, User as UserIcon, Eye, EyeSlash } from 'iconsax-react';
 import { useToast } from '@/context/toast-context';
