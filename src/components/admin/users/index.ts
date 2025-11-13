@@ -1,0 +1,4 @@
+// src/components/admin/users/index.ts
+export { default as CreateUserModal } from './CreateUserModal';
+export { default as UsersTable } from './UsersTable';
+export { default as UsersFilters } from './UsersFilters';
