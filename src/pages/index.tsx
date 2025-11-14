@@ -11,7 +11,8 @@ import DashboardPage from "./DashboardPage";
 import DashboardRedirectPage from "./DashboardRedirectPage";
 import AdminDashboardPage from "./admin/AdminDashboardPage";
 import AdminUsersPage from "./admin/AdminUsersPage";
-import AdminChannelsPage from "./admin/AdminChannelsPage";
+import AdminSourceChannelsPage from "./admin/AdminSourceChannelsPage";
+import AdminPublicationChannelsPage from "./admin/AdminPublicationChannelsPage";
 import AdminRollingPage from "./admin/AdminRollingPage";
 import AdminAnalyticsPage from "./admin/AdminAnalyticsPage";
 import AdminActivityPage from "./admin/AdminActivityPage";
@@ -52,7 +53,8 @@ const router = createBrowserRouter([
           { path: "", element: <AdminDashboardPage /> }, // Default to dashboard
           { path: "dashboard", element: <AdminDashboardPage /> },
           { path: "users", element: <AdminUsersPage /> },
-          { path: "channels", element: <AdminChannelsPage /> },
+          { path: "source-channels", element: <AdminSourceChannelsPage /> },
+          { path: "publication-channels", element: <AdminPublicationChannelsPage /> },
           { path: "rolling", element: <AdminRollingPage /> },
           { path: "analytics", element: <AdminAnalyticsPage /> },
           { path: "activity", element: <AdminActivityPage /> },
