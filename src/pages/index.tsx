@@ -14,6 +14,7 @@ import AdminUsersPage from "./admin/AdminUsersPage";
 import AdminSourceChannelsPage from "./admin/AdminSourceChannelsPage";
 import AdminPublicationChannelsPage from "./admin/AdminPublicationChannelsPage";
 import AdminRollingPage from "./admin/AdminRollingPage";
+import AdminCalendarPage from "./admin/AdminCalendarPage";
 import AdminAnalyticsPage from "./admin/AdminAnalyticsPage";
 import AdminActivityPage from "./admin/AdminActivityPage";
 import AdminSettingsPage from "./admin/AdminSettingsPage";
@@ -56,6 +57,7 @@ const router = createBrowserRouter([
           { path: "source-channels", element: <AdminSourceChannelsPage /> },
           { path: "publication-channels", element: <AdminPublicationChannelsPage /> },
           { path: "rolling", element: <AdminRollingPage /> },
+          { path: "calendar", element: <AdminCalendarPage /> },
           { path: "analytics", element: <AdminAnalyticsPage /> },
           { path: "activity", element: <AdminActivityPage /> },
           { path: "settings", element: <AdminSettingsPage /> },

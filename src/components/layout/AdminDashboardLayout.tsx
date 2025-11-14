@@ -16,6 +16,7 @@ import {
   Logout,
   Setting,
   Activity,
+  Calendar,
 } from 'iconsax-react';
 
 interface SidebarItem {
@@ -62,6 +63,12 @@ const AdminDashboardLayout: React.FC = () => {
       label: 'Rolling',
       icon: <TrendUp color="#FF0000" size={20} className="text-red-600" />,
       description: 'Roll & Assignation',
+    },
+    {
+      path: '/admin/calendar',
+      label: 'Calendrier',
+      icon: <Calendar color="#FF0000" size={20} className="text-red-600" />,
+      description: 'Planning des shorts',
     },
     {
       path: '/admin/analytics',
