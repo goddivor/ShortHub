@@ -1,19 +1,11 @@
 // src/components/admin/users/UsersTable.tsx
 import React from 'react';
-import { Edit, Trash, Lock, Unlock, User } from 'iconsax-react';
-import { UserStatus } from '@/types/graphql';
+import { Edit2, Trash, Lock, Unlock, User as UserIcon } from 'iconsax-react';
+import type { UserStatus, User } from '@/types/graphql';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  role: string;
-  status: string;
-  createdAt: string;
-}
-
+// Force TypeScript reload - Uses global User interface from @/types/graphql
 interface UsersTableProps {
   users: User[];
   loading?: boolean;
@@ -83,7 +75,7 @@ const UsersTable: React.FC<UsersTableProps> = ({
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-12 text-center">
           <div className="bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-            <User size={32} color="#9CA3AF" variant="Bulk" />
+            <UserIcon size={32} color="#9CA3AF" variant="Bulk" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Aucun utilisateur</h3>
           <p className="text-gray-500">Aucun utilisateur ne correspond aux filtres sélectionnés</p>
@@ -152,7 +144,9 @@ const UsersTable: React.FC<UsersTableProps> = ({
 
                 {/* Email */}
                 <td className="px-6 py-4">
-                  <span className="text-sm text-gray-700">{user.email}</span>
+                  <span className="text-sm text-gray-700">
+                    {user.email || <span className="text-gray-400 italic">Non connecté</span>}
+                  </span>
                 </td>
 
                 {/* Role */}
@@ -204,9 +198,9 @@ const UsersTable: React.FC<UsersTableProps> = ({
                         title={user.status === 'ACTIVE' ? 'Bloquer' : 'Débloquer'}
                       >
                         {user.status === 'ACTIVE' ? (
-                          <Lock size={18} color="currentColor" variant="Bold" />
+                          <Lock size={18} color="currentColor" />
                         ) : (
-                          <Unlock size={18} color="currentColor" variant="Bold" />
+                          <Unlock size={18} color="currentColor" />
                         )}
                       </button>
 
@@ -216,7 +210,7 @@ const UsersTable: React.FC<UsersTableProps> = ({
                         className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-all hover:scale-110"
                         title="Modifier"
                       >
-                        <Edit size={18} color="currentColor" variant="Bold" />
+                        <Edit2 size={18} color="currentColor" />
                       </button>
 
                       {/* Delete */}
@@ -225,7 +219,7 @@ const UsersTable: React.FC<UsersTableProps> = ({
                         className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition-all hover:scale-110"
                         title="Supprimer"
                       >
-                        <Trash size={18} color="currentColor" variant="Bold" />
+                        <Trash size={18} color="currentColor" />
                       </button>
                     </div>
                   ) : (
