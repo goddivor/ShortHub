@@ -31,6 +31,14 @@ export enum EditType {
   AVEC_EDIT = 'AVEC_EDIT',
 }
 
+// Types de contenu pour les chaînes sources
+export enum ContentType {
+  VA_SANS_EDIT = 'VA_SANS_EDIT',  // Version Anglaise sans édition
+  VA_AVEC_EDIT = 'VA_AVEC_EDIT',  // Version Anglaise avec édition
+  VF_SANS_EDIT = 'VF_SANS_EDIT',  // Version Française sans édition
+  VF_AVEC_EDIT = 'VF_AVEC_EDIT',  // Version Française avec édition
+}
+
 export enum ChannelPurpose {
   SOURCE = 'SOURCE',
   PUBLICATION = 'PUBLICATION',
@@ -41,6 +49,19 @@ export enum ChannelType {
   ONLY = 'ONLY',
 }
 
+// Statuts pour les shorts
+export enum ShortStatus {
+  ROLLED = 'ROLLED',           // Short généré aléatoirement
+  RETAINED = 'RETAINED',       // Short retenu par l'admin
+  REJECTED = 'REJECTED',       // Short rejeté (peut réapparaître)
+  ASSIGNED = 'ASSIGNED',       // Assigné à un vidéaste
+  IN_PROGRESS = 'IN_PROGRESS', // Vidéaste travaille dessus
+  COMPLETED = 'COMPLETED',     // Vidéaste a terminé
+  VALIDATED = 'VALIDATED',     // Admin a validé
+  PUBLISHED = 'PUBLISHED',     // Publié sur YouTube
+}
+
+// Garder VideoStatus pour compatibilité
 export enum VideoStatus {
   ROLLED = 'ROLLED',
   ASSIGNED = 'ASSIGNED',
@@ -61,11 +82,86 @@ export enum NotificationType {
   ACCOUNT_UNBLOCKED = 'ACCOUNT_UNBLOCKED',
 }
 
+// ============================================
+// NOUVEAUX TYPES - SYSTÈME DE SHORTS
+// ============================================
+
+// Chaîne Source - Chaînes dont on récupère les shorts
+export interface SourceChannel {
+  id: string;
+  channelId: string;
+  channelName: string;
+  profileImageUrl?: string;
+  contentType: ContentType;
+  totalVideos?: number;
+  shortsRolled?: Short[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Chaîne Admin - Chaînes YouTube de l'admin
+export interface AdminChannel {
+  id: string;
+  channelId: string;
+  channelName: string;
+  profileImageUrl: string;
+  totalVideos?: number;
+  subscriberCount?: number;
+  shortsAssigned?: Short[];
+  stats?: AdminChannelStats;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminChannelStats {
+  totalShortsPublished: number;
+  totalShortsInProgress: number;
+  totalShortsCompleted: number;
+  videosPublishedLast7Days: DailyVideoCount[];
+  videosPublishedLast30Days: DailyVideoCount[];
+}
+
+// Short - Vidéo courte récupérée depuis une chaîne source
+export interface Short {
+  id: string;
+  videoId: string;
+  videoUrl: string;
+  sourceChannel: SourceChannel;
+  status: ShortStatus;
+  rolledAt: string;
+  retainedAt?: string;
+  rejectedAt?: string;
+  assignedTo?: User;
+  assignedBy?: User;
+  assignedAt?: string;
+  deadline?: string;
+  targetChannel?: AdminChannel;
+  completedAt?: string;
+  validatedAt?: string;
+  publishedAt?: string;
+  title?: string;
+  description?: string;
+  tags: string[];
+  notes?: string;
+  adminFeedback?: string;
+  comments?: ShortComment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShortComment {
+  id: string;
+  short: Short;
+  author: User;
+  comment: string;
+  createdAt: string;
+}
+
 // User Types
 export interface User {
   id: string;
   username: string;
-  email: string;
+  email?: string;  // Optional - connected by user themselves
   role: UserRole;
   status: UserStatus;
   phone?: string;
@@ -223,13 +319,9 @@ export interface ChannelGrowth {
 // Input Types
 export interface CreateUserInput {
   username: string;
-  email: string;
   password: string;
   role: UserRole;
-  phone?: string;
-  whatsappLinked?: boolean;
-  emailNotifications?: boolean;
-  whatsappNotifications?: boolean;
+  // Email and phone are not provided at creation - user connects them later
 }
 
 export interface UpdateUserInput {
@@ -291,6 +383,61 @@ export interface VideoFilterInput {
   startDate?: string;
   endDate?: string;
   isLate?: boolean;
+}
+
+// ============================================
+// INPUT TYPES - NOUVEAUX
+// ============================================
+
+export interface CreateSourceChannelInput {
+  youtubeUrl: string;
+  contentType: ContentType;
+}
+
+export interface UpdateSourceChannelInput {
+  contentType?: ContentType;
+  profileImageUrl?: string;
+}
+
+export interface CreateAdminChannelInput {
+  youtubeUrl: string;
+}
+
+export interface UpdateAdminChannelInput {
+  profileImageUrl?: string;
+}
+
+export interface RollShortInput {
+  sourceChannelId: string;
+}
+
+export interface AssignShortInput {
+  shortId: string;
+  videasteId: string;
+  targetChannelId: string;
+  deadline: string;
+  notes?: string;
+}
+
+export interface UpdateShortStatusInput {
+  shortId: string;
+  status: ShortStatus;
+  adminFeedback?: string;
+}
+
+export interface CreateShortCommentInput {
+  shortId: string;
+  comment: string;
+}
+
+export interface ShortFilterInput {
+  status?: ShortStatus;
+  assignedToId?: string;
+  sourceChannelId?: string;
+  targetChannelId?: string;
+  contentType?: ContentType;
+  startDate?: string;
+  endDate?: string;
 }
 
 // Connection Types (for pagination)

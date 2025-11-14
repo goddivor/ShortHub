@@ -517,6 +517,25 @@ export const UPDATE_USER_STATUS_MUTATION = gql`
   }
 `;
 
+export const UPDATE_USER_MUTATION = gql`
+  mutation UpdateUser($id: ID!, $input: UpdateUserInput!) {
+    updateUser(id: $id, input: $input) {
+      id
+      username
+      email
+      phone
+      emailNotifications
+      whatsappNotifications
+    }
+  }
+`;
+
+export const DELETE_USER_MUTATION = gql`
+  mutation DeleteUser($id: ID!) {
+    deleteUser(id: $id)
+  }
+`;
+
 // ============================================
 // NOTIFICATIONS
 // ============================================
@@ -615,5 +634,419 @@ export const VIDEO_ASSIGNED_SUBSCRIPTION = gql`
       scheduledDate
       status
     }
+  }
+`;
+
+// ============================================
+// SOURCE CHANNELS
+// ============================================
+
+export const GET_SOURCE_CHANNELS_QUERY = gql`
+  query GetSourceChannels($contentType: ContentType) {
+    sourceChannels(contentType: $contentType) {
+      id
+      channelId
+      channelName
+      profileImageUrl
+      contentType
+      totalVideos
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_SOURCE_CHANNEL_QUERY = gql`
+  query GetSourceChannel($id: ID!) {
+    sourceChannel(id: $id) {
+      id
+      channelId
+      channelName
+      profileImageUrl
+      contentType
+      totalVideos
+      shortsRolled {
+        id
+        videoId
+        videoUrl
+        status
+        title
+        rolledAt
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const CREATE_SOURCE_CHANNEL_MUTATION = gql`
+  mutation CreateSourceChannel($input: CreateSourceChannelInput!) {
+    createSourceChannel(input: $input) {
+      id
+      channelId
+      channelName
+      profileImageUrl
+      contentType
+      totalVideos
+      createdAt
+    }
+  }
+`;
+
+export const UPDATE_SOURCE_CHANNEL_MUTATION = gql`
+  mutation UpdateSourceChannel($id: ID!, $input: UpdateSourceChannelInput!) {
+    updateSourceChannel(id: $id, input: $input) {
+      id
+      channelName
+      profileImageUrl
+      contentType
+      updatedAt
+    }
+  }
+`;
+
+export const DELETE_SOURCE_CHANNEL_MUTATION = gql`
+  mutation DeleteSourceChannel($id: ID!) {
+    deleteSourceChannel(id: $id)
+  }
+`;
+
+// ============================================
+// ADMIN CHANNELS
+// ============================================
+
+export const GET_ADMIN_CHANNELS_QUERY = gql`
+  query GetAdminChannels {
+    adminChannels {
+      id
+      channelId
+      channelName
+      profileImageUrl
+      totalVideos
+      subscriberCount
+      createdAt
+      updatedAt
+      stats {
+        totalShortsPublished
+        totalShortsInProgress
+        totalShortsCompleted
+        videosPublishedLast7Days {
+          date
+          count
+        }
+        videosPublishedLast30Days {
+          date
+          count
+        }
+      }
+    }
+  }
+`;
+
+export const GET_ADMIN_CHANNEL_QUERY = gql`
+  query GetAdminChannel($id: ID!) {
+    adminChannel(id: $id) {
+      id
+      channelId
+      channelName
+      profileImageUrl
+      totalVideos
+      subscriberCount
+      createdAt
+      updatedAt
+      shortsAssigned {
+        id
+        videoId
+        videoUrl
+        status
+        title
+        assignedAt
+        deadline
+        assignedTo {
+          id
+          username
+        }
+      }
+      stats {
+        totalShortsPublished
+        totalShortsInProgress
+        totalShortsCompleted
+        videosPublishedLast7Days {
+          date
+          count
+        }
+        videosPublishedLast30Days {
+          date
+          count
+        }
+      }
+    }
+  }
+`;
+
+export const GET_ADMIN_CHANNEL_STATS_QUERY = gql`
+  query GetAdminChannelStats($channelId: ID!) {
+    adminChannelStats(channelId: $channelId) {
+      totalShortsPublished
+      totalShortsInProgress
+      totalShortsCompleted
+      videosPublishedLast7Days {
+        date
+        count
+      }
+      videosPublishedLast30Days {
+        date
+        count
+      }
+    }
+  }
+`;
+
+export const CREATE_ADMIN_CHANNEL_MUTATION = gql`
+  mutation CreateAdminChannel($input: CreateAdminChannelInput!) {
+    createAdminChannel(input: $input) {
+      id
+      channelId
+      channelName
+      profileImageUrl
+      totalVideos
+      subscriberCount
+      createdAt
+    }
+  }
+`;
+
+export const UPDATE_ADMIN_CHANNEL_MUTATION = gql`
+  mutation UpdateAdminChannel($id: ID!, $input: UpdateAdminChannelInput!) {
+    updateAdminChannel(id: $id, input: $input) {
+      id
+      channelName
+      profileImageUrl
+      updatedAt
+    }
+  }
+`;
+
+export const DELETE_ADMIN_CHANNEL_MUTATION = gql`
+  mutation DeleteAdminChannel($id: ID!) {
+    deleteAdminChannel(id: $id)
+  }
+`;
+
+// ============================================
+// SHORTS
+// ============================================
+
+export const GET_SHORTS_QUERY = gql`
+  query GetShorts($filter: ShortFilterInput) {
+    shorts(filter: $filter) {
+      id
+      videoId
+      videoUrl
+      status
+      title
+      description
+      tags
+      rolledAt
+      retainedAt
+      rejectedAt
+      assignedAt
+      deadline
+      completedAt
+      validatedAt
+      publishedAt
+      notes
+      adminFeedback
+      sourceChannel {
+        id
+        channelName
+        profileImageUrl
+        contentType
+      }
+      assignedTo {
+        id
+        username
+      }
+      assignedBy {
+        id
+        username
+      }
+      targetChannel {
+        id
+        channelName
+        profileImageUrl
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_SHORT_QUERY = gql`
+  query GetShort($id: ID!) {
+    short(id: $id) {
+      id
+      videoId
+      videoUrl
+      status
+      title
+      description
+      tags
+      rolledAt
+      retainedAt
+      rejectedAt
+      assignedAt
+      deadline
+      completedAt
+      validatedAt
+      publishedAt
+      notes
+      adminFeedback
+      sourceChannel {
+        id
+        channelName
+        profileImageUrl
+        contentType
+      }
+      assignedTo {
+        id
+        username
+        email
+      }
+      assignedBy {
+        id
+        username
+      }
+      targetChannel {
+        id
+        channelName
+        profileImageUrl
+      }
+      comments {
+        id
+        author {
+          id
+          username
+        }
+        comment
+        createdAt
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const ROLL_SHORT_MUTATION = gql`
+  mutation RollShort($input: RollShortInput!) {
+    rollShort(input: $input) {
+      id
+      videoId
+      videoUrl
+      status
+      title
+      tags
+      rolledAt
+      sourceChannel {
+        id
+        channelName
+        contentType
+      }
+    }
+  }
+`;
+
+export const RETAIN_SHORT_MUTATION = gql`
+  mutation RetainShort($shortId: ID!) {
+    retainShort(shortId: $shortId) {
+      id
+      status
+      retainedAt
+    }
+  }
+`;
+
+export const REJECT_SHORT_MUTATION = gql`
+  mutation RejectShort($shortId: ID!) {
+    rejectShort(shortId: $shortId) {
+      id
+      status
+      rejectedAt
+    }
+  }
+`;
+
+export const ASSIGN_SHORT_MUTATION = gql`
+  mutation AssignShort($input: AssignShortInput!) {
+    assignShort(input: $input) {
+      id
+      status
+      assignedAt
+      deadline
+      notes
+      assignedTo {
+        id
+        username
+      }
+      assignedBy {
+        id
+        username
+      }
+      targetChannel {
+        id
+        channelName
+      }
+    }
+  }
+`;
+
+export const REASSIGN_SHORT_MUTATION = gql`
+  mutation ReassignShort($shortId: ID!, $newVideasteId: ID!) {
+    reassignShort(shortId: $shortId, newVideasteId: $newVideasteId) {
+      id
+      assignedTo {
+        id
+        username
+      }
+    }
+  }
+`;
+
+export const UPDATE_SHORT_STATUS_MUTATION = gql`
+  mutation UpdateShortStatus($input: UpdateShortStatusInput!) {
+    updateShortStatus(input: $input) {
+      id
+      status
+      completedAt
+      validatedAt
+      publishedAt
+      adminFeedback
+    }
+  }
+`;
+
+export const DELETE_SHORT_MUTATION = gql`
+  mutation DeleteShort($id: ID!) {
+    deleteShort(id: $id)
+  }
+`;
+
+export const CREATE_SHORT_COMMENT_MUTATION = gql`
+  mutation CreateShortComment($input: CreateShortCommentInput!) {
+    createShortComment(input: $input) {
+      id
+      author {
+        id
+        username
+      }
+      comment
+      createdAt
+    }
+  }
+`;
+
+export const DELETE_SHORT_COMMENT_MUTATION = gql`
+  mutation DeleteShortComment($id: ID!) {
+    deleteShortComment(id: $id)
   }
 `;
