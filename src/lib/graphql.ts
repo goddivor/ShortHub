@@ -722,6 +722,7 @@ export const GET_ADMIN_CHANNELS_QUERY = gql`
       channelId
       channelName
       profileImageUrl
+      contentType
       totalVideos
       subscriberCount
       createdAt
@@ -763,6 +764,7 @@ export const GET_ADMIN_DASHBOARD_STATS_QUERY = gql`
       channelId
       channelName
       profileImageUrl
+      contentType
       totalVideos
       subscriberCount
       shortsAssigned {
@@ -791,6 +793,7 @@ export const GET_ADMIN_CHANNEL_QUERY = gql`
       channelId
       channelName
       profileImageUrl
+      contentType
       totalVideos
       subscriberCount
       createdAt
@@ -850,6 +853,7 @@ export const CREATE_ADMIN_CHANNEL_MUTATION = gql`
       channelId
       channelName
       profileImageUrl
+      contentType
       totalVideos
       subscriberCount
       createdAt
@@ -863,6 +867,7 @@ export const UPDATE_ADMIN_CHANNEL_MUTATION = gql`
       id
       channelName
       profileImageUrl
+      contentType
       updatedAt
     }
   }
@@ -1001,8 +1006,18 @@ export const RETAIN_SHORT_MUTATION = gql`
   mutation RetainShort($shortId: ID!) {
     retainShort(shortId: $shortId) {
       id
+      videoId
+      videoUrl
       status
+      title
       retainedAt
+      rolledAt
+      sourceChannel {
+        id
+        channelName
+        profileImageUrl
+        contentType
+      }
     }
   }
 `;
@@ -1089,5 +1104,24 @@ export const CREATE_SHORT_COMMENT_MUTATION = gql`
 export const DELETE_SHORT_COMMENT_MUTATION = gql`
   mutation DeleteShortComment($id: ID!) {
     deleteShortComment(id: $id)
+  }
+`;
+
+// ============================================
+// SHORTS STATS
+// ============================================
+
+export const GET_SHORTS_STATS_QUERY = gql`
+  query GetShortsStats {
+    shortsStats {
+      totalRolled
+      totalRetained
+      totalRejected
+      totalAssigned
+      totalInProgress
+      totalCompleted
+      totalValidated
+      totalPublished
+    }
   }
 `;

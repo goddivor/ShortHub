@@ -105,6 +105,7 @@ export interface AdminChannel {
   channelId: string;
   channelName: string;
   profileImageUrl: string;
+  contentType: ContentType;
   totalVideos?: number;
   subscriberCount?: number;
   shortsAssigned?: Short[];
@@ -401,9 +402,11 @@ export interface UpdateSourceChannelInput {
 
 export interface CreateAdminChannelInput {
   youtubeUrl: string;
+  contentType: ContentType;
 }
 
 export interface UpdateAdminChannelInput {
+  contentType?: ContentType;
   profileImageUrl?: string;
 }
 
@@ -469,6 +472,18 @@ export interface AuthPayload {
   token: string;
   refreshToken: string;
   user: User;
+}
+
+// Shorts Stats
+export interface ShortsStats {
+  totalRolled: number;
+  totalRetained: number;
+  totalRejected: number;
+  totalAssigned: number;
+  totalInProgress: number;
+  totalCompleted: number;
+  totalValidated: number;
+  totalPublished: number;
 }
 
 // Utility types
