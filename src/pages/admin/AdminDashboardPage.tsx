@@ -2,9 +2,13 @@
 import React from 'react';
 import { useQuery } from '@apollo/client/react';
 import {
-  GET_ADMIN_DASHBOARD_STATS_QUERY
+  GET_ADMIN_DASHBOARD_STATS_QUERY,
+  GET_SHORTS_STATS_QUERY,
+  GET_SHORTS_QUERY
 } from '@/lib/graphql';
 import SpinLoader from '@/components/SpinLoader';
+import type { ShortsStats, Short } from '@/types/graphql';
+import { ShortStatus } from '@/types/graphql';
 import {
   BarChart,
   Bar,
@@ -108,46 +112,62 @@ interface DashboardData {
 
 const AdminDashboardPage: React.FC = () => {
   const { data, loading } = useQuery<DashboardData>(GET_ADMIN_DASHBOARD_STATS_QUERY);
+  const { data: shortsStatsData } = useQuery<{ shortsStats: ShortsStats }>(GET_SHORTS_STATS_QUERY);
+  const { data: publishedShortsData } = useQuery<{ shorts: Short[] }>(GET_SHORTS_QUERY, {
+    variables: {
+      filter: {
+        status: ShortStatus.PUBLISHED
+      }
+    }
+  });
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <SpinLoader />
-      </div>
-    );
-  }
-
-  const sourceChannels = data?.sourceChannels || [];
-  const adminChannels = data?.adminChannels || [];
+  // Déplacer toutes les variables et useMemo AVANT le return conditionnel
+  const sourceChannels = React.useMemo(() => data?.sourceChannels || [], [data?.sourceChannels]);
+  const adminChannels = React.useMemo(() => data?.adminChannels || [], [data?.adminChannels]);
+  const publishedShorts = React.useMemo(() => publishedShortsData?.shorts || [], [publishedShortsData?.shorts]);
 
   // Calcul des statistiques
   const totalChannels = sourceChannels.length + adminChannels.length;
   const totalSourceChannels = sourceChannels.length;
   const totalPublicationChannels = adminChannels.length;
   const totalUsers = data?.users?.totalCount || 0;
-  const totalPublishedShorts = adminChannels.reduce((acc, channel) => acc + (channel.shortsAssigned?.length || 0), 0);
-  const totalVideos = adminChannels.reduce((acc, channel) => acc + (channel.totalVideos || 0), 0);
+  const totalPublishedShorts = shortsStatsData?.shortsStats?.totalPublished || 0;
+  const totalVideos = React.useMemo(
+    () => adminChannels.reduce((acc, channel) => acc + (channel.totalVideos || 0), 0),
+    [adminChannels]
+  );
 
   // Données pour le graphique des chaînes par type
-  const channelTypeData = [
+  const channelTypeData = React.useMemo(() => [
     { name: 'Sources', value: totalSourceChannels, fill: '#3B82F6' },
     { name: 'Publication', value: totalPublicationChannels, fill: '#8B5CF6' },
-  ];
+  ], [totalSourceChannels, totalPublicationChannels]);
 
   // Données pour les shorts publiés par chaîne (top 5)
-  const publishedShortsData = adminChannels
-    .map(channel => ({
-      name: channel.channelName.length > 15 ? channel.channelName.substring(0, 15) + '...' : channel.channelName,
-      fullName: channel.channelName,
-      profileImageUrl: channel.profileImageUrl,
-      shorts: channel.shortsAssigned?.length || 0,
-      videos: channel.totalVideos || 0,
-    }))
-    .sort((a, b) => b.shorts - a.shorts)
-    .slice(0, 5);
+  const publishedShortsChartData = React.useMemo(() => {
+    // Compter les shorts publiés par chaîne
+    const shortsByChannel = new Map<string, number>();
+    publishedShorts.forEach(short => {
+      if (short.targetChannel?.id) {
+        const count = shortsByChannel.get(short.targetChannel.id) || 0;
+        shortsByChannel.set(short.targetChannel.id, count + 1);
+      }
+    });
+
+    return adminChannels
+      .map(channel => ({
+        name: channel.channelName.length > 15 ? channel.channelName.substring(0, 15) + '...' : channel.channelName,
+        fullName: channel.channelName,
+        profileImageUrl: channel.profileImageUrl,
+        shorts: shortsByChannel.get(channel.id) || 0,
+        videos: channel.totalVideos || 0,
+      }))
+      .sort((a, b) => b.shorts - a.shorts)
+      .slice(0, 5);
+  }, [adminChannels, publishedShorts]);
 
   // Données pour le graphique des vidéos totales par chaîne (top 5)
-  const totalVideosData = adminChannels
+  const totalVideosData = React.useMemo(() => adminChannels
     .map(channel => ({
       name: channel.channelName.length > 15 ? channel.channelName.substring(0, 15) + '...' : channel.channelName,
       fullName: channel.channelName,
@@ -156,17 +176,25 @@ const AdminDashboardPage: React.FC = () => {
     }))
     .filter(d => d.videos > 0)
     .sort((a, b) => b.videos - a.videos)
-    .slice(0, 5);
+    .slice(0, 5), [adminChannels]);
 
   // Simulation de données de sorties de vidéos sur 30 jours (à remplacer par de vraies données)
-  const videoReleasesData = Array.from({ length: 30 }, (_, i) => {
+  const videoReleasesData = React.useMemo(() => Array.from({ length: 30 }, (_, i) => {
     const date = new Date();
     date.setDate(date.getDate() - (29 - i));
     return {
       date: date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
       shorts: Math.floor(Math.random() * 10), // Simulation - à remplacer par vraies données
     };
-  });
+  }), []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <SpinLoader />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-8">
@@ -301,14 +329,14 @@ const AdminDashboardPage: React.FC = () => {
             <TrendUp size={24} color="#EF4444" variant="Bold" />
             <h2 className="text-xl font-bold text-gray-900">Top Chaînes - Shorts Publiés</h2>
           </div>
-          {publishedShortsData.length > 0 ? (
+          {publishedShortsChartData.length > 0 && publishedShortsChartData.some(d => d.shorts > 0) ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={publishedShortsData}>
+              <BarChart data={publishedShortsChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="name"
                   height={60}
-                  tick={createCustomXAxisTick(publishedShortsData)}
+                  tick={createCustomXAxisTick(publishedShortsChartData)}
                 />
                 <YAxis />
                 <Tooltip
@@ -317,7 +345,7 @@ const AdminDashboardPage: React.FC = () => {
                     return value;
                   }}
                   labelFormatter={(label) => {
-                    const channel = publishedShortsData.find(d => d.name === label);
+                    const channel = publishedShortsChartData.find(d => d.name === label);
                     return channel?.fullName || label;
                   }}
                 />
@@ -433,8 +461,10 @@ const AdminDashboardPage: React.FC = () => {
                 </tr>
               ) : (
                 adminChannels.map((channel) => {
+                  // Compter les shorts publiés pour cette chaîne
+                  const publishedCount = publishedShorts.filter(s => s.targetChannel?.id === channel.id).length;
                   const ratio = channel.totalVideos && channel.totalVideos > 0
-                    ? ((channel.shortsAssigned?.length || 0) / channel.totalVideos * 100).toFixed(1)
+                    ? (publishedCount / channel.totalVideos * 100).toFixed(1)
                     : '0.0';
 
                   return (
@@ -461,7 +491,7 @@ const AdminDashboardPage: React.FC = () => {
                       </td>
                       <td className="py-4 px-6">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-700">
-                          {channel.shortsAssigned?.length || 0}
+                          {publishedCount}
                         </span>
                       </td>
                       <td className="py-4 px-6">
