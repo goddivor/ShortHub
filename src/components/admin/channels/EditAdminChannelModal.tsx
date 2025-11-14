@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { UPDATE_ADMIN_CHANNEL_MUTATION, GET_ADMIN_CHANNELS_QUERY } from '@/lib/graphql';
-import { AdminChannel } from '@/types/graphql';
+import { AdminChannel, ContentType } from '@/types/graphql';
 import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
-import { CloseCircle, Edit, Image } from 'iconsax-react';
+import { CloseCircle, Edit, VideoPlay } from 'iconsax-react';
 
 interface EditAdminChannelModalProps {
   isOpen: boolean;
@@ -13,12 +13,12 @@ interface EditAdminChannelModalProps {
 }
 
 export default function EditAdminChannelModal({ isOpen, onClose, channel }: EditAdminChannelModalProps) {
-  const [profileImageUrl, setProfileImageUrl] = useState('');
+  const [contentType, setContentType] = useState<ContentType>(ContentType.VA_SANS_EDIT);
   const toast = useToast();
 
   useEffect(() => {
     if (channel) {
-      setProfileImageUrl(channel.profileImageUrl || '');
+      setContentType(channel.contentType || ContentType.VA_SANS_EDIT);
     }
   }, [channel]);
 
@@ -43,7 +43,7 @@ export default function EditAdminChannelModal({ isOpen, onClose, channel }: Edit
         variables: {
           id: channel.id,
           input: {
-            profileImageUrl: profileImageUrl.trim() || undefined,
+            contentType,
           },
         },
       });
@@ -98,45 +98,28 @@ export default function EditAdminChannelModal({ isOpen, onClose, channel }: Edit
             </div>
           </div>
 
-          {/* Profile Image URL Field */}
+          {/* Content Type Field */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              URL de l'image de profil
+              Type de contenu *
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Image size={18} color="#9CA3AF" variant="Bold" />
+                <VideoPlay size={18} color="#9CA3AF" variant="Bold" />
               </div>
-              <input
-                type="url"
-                value={profileImageUrl}
-                onChange={(e) => setProfileImageUrl(e.target.value)}
-                className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                placeholder="https://yt3.ggpht.com/..."
+              <select
+                value={contentType}
+                onChange={(e) => setContentType(e.target.value as ContentType)}
+                className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all appearance-none bg-white"
                 disabled={loading}
-              />
+              >
+                <option value={ContentType.VA_SANS_EDIT}>VA Sans Édition</option>
+                <option value={ContentType.VA_AVEC_EDIT}>VA Avec Édition</option>
+                <option value={ContentType.VF_SANS_EDIT}>VF Sans Édition</option>
+                <option value={ContentType.VF_AVEC_EDIT}>VF Avec Édition</option>
+              </select>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Laisser vide pour utiliser l'image par défaut de YouTube
-            </p>
           </div>
-
-          {/* Image Preview */}
-          {profileImageUrl && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Aperçu
-              </label>
-              <img
-                src={profileImageUrl}
-                alt="Profile preview"
-                className="w-20 h-20 rounded-full object-cover border-2 border-gray-300"
-                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            </div>
-          )}
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">

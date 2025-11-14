@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { CREATE_ADMIN_CHANNEL_MUTATION, GET_ADMIN_CHANNELS_QUERY } from '@/lib/graphql';
+import { ContentType } from '@/types/graphql';
 import { useToast } from '@/context/toast-context';
 import { extractChannelData } from '@/lib/youtube-api';
 import SpinLoader from '@/components/SpinLoader';
-import { CloseCircle, Youtube, TickCircle, Warning2 } from 'iconsax-react';
+import { CloseCircle, Youtube, VideoPlay, TickCircle, Warning2 } from 'iconsax-react';
 
 interface CreateAdminChannelModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface ChannelPreview {
 
 export default function CreateAdminChannelModal({ isOpen, onClose }: CreateAdminChannelModalProps) {
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [contentType, setContentType] = useState<ContentType>(ContentType.VA_SANS_EDIT);
   const [channelPreview, setChannelPreview] = useState<ChannelPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -37,6 +39,7 @@ export default function CreateAdminChannelModal({ isOpen, onClose }: CreateAdmin
 
   const handleClose = () => {
     setYoutubeUrl('');
+    setContentType(ContentType.VA_SANS_EDIT);
     setChannelPreview(null);
     setPreviewError(null);
     onClose();
@@ -98,6 +101,7 @@ export default function CreateAdminChannelModal({ isOpen, onClose }: CreateAdmin
         variables: {
           input: {
             youtubeUrl: youtubeUrl.trim(),
+            contentType,
           },
         },
       });
@@ -213,6 +217,29 @@ export default function CreateAdminChannelModal({ isOpen, onClose }: CreateAdmin
               </div>
             </div>
           )}
+
+          {/* Content Type Field */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Type de contenu *
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <VideoPlay size={18} color="#9CA3AF" variant="Bold" />
+              </div>
+              <select
+                value={contentType}
+                onChange={(e) => setContentType(e.target.value as ContentType)}
+                className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all appearance-none bg-white"
+                disabled={loading}
+              >
+                <option value={ContentType.VA_SANS_EDIT}>VA Sans Édition</option>
+                <option value={ContentType.VA_AVEC_EDIT}>VA Avec Édition</option>
+                <option value={ContentType.VF_SANS_EDIT}>VF Sans Édition</option>
+                <option value={ContentType.VF_AVEC_EDIT}>VF Avec Édition</option>
+              </select>
+            </div>
+          </div>
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">

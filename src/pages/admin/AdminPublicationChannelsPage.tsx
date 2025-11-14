@@ -5,14 +5,37 @@ import {
   GET_ADMIN_CHANNELS_QUERY,
   DELETE_ADMIN_CHANNEL_MUTATION,
 } from '@/lib/graphql';
-import { AdminChannel } from '@/types/graphql';
+import { AdminChannel, ContentType } from '@/types/graphql';
 import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
 import CreateAdminChannelModal from '@/components/admin/channels/CreateAdminChannelModal';
 import EditAdminChannelModal from '@/components/admin/channels/EditAdminChannelModal';
 import DeleteChannelModal from '@/components/admin/channels/DeleteChannelModal';
 
+// Helper pour afficher le label du type de contenu
+const getContentTypeLabel = (contentType: ContentType): string => {
+  const labels = {
+    [ContentType.VA_SANS_EDIT]: 'VA Sans Édition',
+    [ContentType.VA_AVEC_EDIT]: 'VA Avec Édition',
+    [ContentType.VF_SANS_EDIT]: 'VF Sans Édition',
+    [ContentType.VF_AVEC_EDIT]: 'VF Avec Édition',
+  };
+  return labels[contentType] || contentType;
+};
+
+// Helper pour obtenir la couleur du badge selon le type
+const getContentTypeColor = (contentType: ContentType): string => {
+  const colors = {
+    [ContentType.VA_SANS_EDIT]: 'bg-blue-100 text-blue-800',
+    [ContentType.VA_AVEC_EDIT]: 'bg-blue-100 text-blue-800',
+    [ContentType.VF_SANS_EDIT]: 'bg-purple-100 text-purple-800',
+    [ContentType.VF_AVEC_EDIT]: 'bg-purple-100 text-purple-800',
+  };
+  return colors[contentType] || 'bg-gray-100 text-gray-800';
+};
+
 export default function AdminPublicationChannelsPage() {
+  const [contentTypeFilter, setContentTypeFilter] = useState<ContentType | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -43,6 +66,12 @@ export default function AdminPublicationChannelsPage() {
     if (!data?.adminChannels) return [];
     let filtered = data.adminChannels;
 
+    // Filtrer par type de contenu
+    if (contentTypeFilter !== 'ALL') {
+      filtered = filtered.filter((channel) => channel.contentType === contentTypeFilter);
+    }
+
+    // Filtrer par recherche
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -53,7 +82,7 @@ export default function AdminPublicationChannelsPage() {
     }
 
     return filtered;
-  }, [data, searchQuery]);
+  }, [data, searchQuery, contentTypeFilter]);
 
   const handleEdit = (channel: AdminChannel) => {
     setSelectedChannel(channel);
@@ -115,35 +144,58 @@ export default function AdminPublicationChannelsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
             <p className="text-purple-100 text-sm font-medium">Total</p>
             <p className="text-3xl font-bold mt-1">{data?.adminChannels?.length || 0}</p>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-            <p className="text-purple-100 text-sm font-medium">Shorts publiés</p>
+            <p className="text-purple-100 text-sm font-medium">VA Sans Édition</p>
             <p className="text-3xl font-bold mt-1">
-              {data?.adminChannels?.reduce((acc, c) => acc + (c.publishedShorts?.length || 0), 0) || 0}
+              {data?.adminChannels?.filter((c) => c.contentType === ContentType.VA_SANS_EDIT).length || 0}
             </p>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-            <p className="text-purple-100 text-sm font-medium">Vidéos totales</p>
+            <p className="text-purple-100 text-sm font-medium">VF Sans Édition</p>
             <p className="text-3xl font-bold mt-1">
-              {data?.adminChannels?.reduce((acc, c) => acc + (c.totalVideos || 0), 0) || 0}
+              {data?.adminChannels?.filter((c) => c.contentType === ContentType.VF_SANS_EDIT).length || 0}
+            </p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+            <p className="text-purple-100 text-sm font-medium">Avec Édition</p>
+            <p className="text-3xl font-bold mt-1">
+              {data?.adminChannels?.filter((c) => c.contentType === ContentType.VA_AVEC_EDIT || c.contentType === ContentType.VF_AVEC_EDIT).length || 0}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Search */}
+      {/* Filters */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Rechercher par nom ou ID de chaîne..."
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-        />
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher par nom ou ID de chaîne..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+          </div>
+          <div className="md:w-64">
+            <select
+              value={contentTypeFilter}
+              onChange={(e) => setContentTypeFilter(e.target.value as ContentType | 'ALL')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="ALL">Tous les types</option>
+              <option value={ContentType.VA_SANS_EDIT}>VA Sans Édition</option>
+              <option value={ContentType.VA_AVEC_EDIT}>VA Avec Édition</option>
+              <option value={ContentType.VF_SANS_EDIT}>VF Sans Édition</option>
+              <option value={ContentType.VF_AVEC_EDIT}>VF Avec Édition</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Channels Table */}
@@ -153,6 +205,7 @@ export default function AdminPublicationChannelsPage() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Chaîne</th>
+                <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Type de contenu</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Vidéos totales</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-gray-700">Shorts publiés</th>
                 <th className="text-right py-4 px-6 text-sm font-semibold text-gray-700">Actions</th>
@@ -161,7 +214,7 @@ export default function AdminPublicationChannelsPage() {
             <tbody className="divide-y divide-gray-200">
               {channels.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-12 text-center">
+                  <td colSpan={5} className="py-12 text-center">
                     <Youtube size={48} color="#9CA3AF" className="mx-auto mb-3" variant="Bulk" />
                     <p className="text-gray-500 font-medium">Aucune chaîne de publication trouvée</p>
                     <p className="text-sm text-gray-400 mt-1">
@@ -188,6 +241,11 @@ export default function AdminPublicationChannelsPage() {
                       </div>
                     </td>
                     <td className="py-4 px-6">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getContentTypeColor(channel.contentType)}`}>
+                        {getContentTypeLabel(channel.contentType)}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6">
                       <span className="text-gray-900 font-medium">
                         {channel.totalVideos !== null && channel.totalVideos !== undefined
                           ? channel.totalVideos.toLocaleString()
@@ -195,7 +253,7 @@ export default function AdminPublicationChannelsPage() {
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="text-gray-900 font-medium">{channel.publishedShorts?.length || 0}</span>
+                      <span className="text-gray-900 font-medium">{channel.shortsAssigned?.length || 0}</span>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex justify-end gap-2">
