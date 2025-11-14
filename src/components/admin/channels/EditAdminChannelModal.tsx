@@ -4,7 +4,7 @@ import { UPDATE_ADMIN_CHANNEL_MUTATION, GET_ADMIN_CHANNELS_QUERY } from '@/lib/g
 import { AdminChannel } from '@/types/graphql';
 import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
-import { CloseCircle, Youtube, Edit, Image } from 'iconsax-react';
+import { CloseCircle, Edit, Image } from 'iconsax-react';
 
 interface EditAdminChannelModalProps {
   isOpen: boolean;
