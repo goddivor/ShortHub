@@ -2,31 +2,37 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserManagement } from '@/hooks/useUserManagement';
-import { CreateUserModal, UsersTable, UsersFilters } from '@/components/admin/users';
+import { CreateUserModal, EditUserModal, DeleteUserModal, UsersTable, UsersFilters } from '@/components/admin/users';
 import SpinLoader from '@/components/SpinLoader';
 import { Add, People } from 'iconsax-react';
-import { UserRole } from '@/types/graphql';
+import type { UserRole, User } from '@/types/graphql';
 
 const AdminUsersPage: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const {
     users,
     totalCount,
     loading,
     creating,
+    updatingUser,
+    deleting,
     filterRole,
     filterStatus,
     setFilterRole,
     setFilterStatus,
     createUser,
+    updateUser,
+    deleteUser,
     toggleUserStatus,
   } = useUserManagement();
 
   const handleCreateUser = async (data: {
     username: string;
-    email: string;
     password: string;
     role: UserRole;
   }) => {
@@ -35,6 +41,39 @@ const AdminUsersPage: React.FC = () => {
       setShowCreateModal(false);
     }
     return success;
+  };
+
+  const handleEditUser = async (userId: string, data: {
+    email?: string;
+    phone?: string;
+    emailNotifications: boolean;
+    whatsappNotifications: boolean;
+  }) => {
+    const success = await updateUser(userId, data);
+    if (success) {
+      setShowEditModal(false);
+      setSelectedUser(null);
+    }
+    return success;
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    const success = await deleteUser(userId);
+    if (success) {
+      setShowDeleteModal(false);
+      setSelectedUser(null);
+    }
+    return success;
+  };
+
+  const handleOpenEditModal = (user: User) => {
+    setSelectedUser(user);
+    setShowEditModal(true);
+  };
+
+  const handleOpenDeleteModal = (user: User) => {
+    setSelectedUser(user);
+    setShowDeleteModal(true);
   };
 
   if (loading) {
@@ -117,7 +156,8 @@ const AdminUsersPage: React.FC = () => {
         loading={loading}
         currentUserId={currentUser?.id}
         onToggleStatus={toggleUserStatus}
-        // onEdit and onDelete can be added later
+        onEdit={handleOpenEditModal}
+        onDelete={handleOpenDeleteModal}
       />
 
       {/* Create User Modal */}
@@ -126,6 +166,30 @@ const AdminUsersPage: React.FC = () => {
         onClose={() => setShowCreateModal(false)}
         onSubmit={handleCreateUser}
         isSubmitting={creating}
+      />
+
+      {/* Edit User Modal */}
+      <EditUserModal
+        isOpen={showEditModal}
+        user={selectedUser}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedUser(null);
+        }}
+        onSubmit={handleEditUser}
+        isSubmitting={updatingUser}
+      />
+
+      {/* Delete User Modal */}
+      <DeleteUserModal
+        isOpen={showDeleteModal}
+        user={selectedUser}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setSelectedUser(null);
+        }}
+        onConfirm={handleDeleteUser}
+        isDeleting={deleting}
       />
     </div>
   );

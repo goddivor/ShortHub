@@ -1,15 +1,27 @@
 // src/hooks/useUserManagement.ts
 import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
-import { GET_USERS_QUERY, CREATE_USER_MUTATION, UPDATE_USER_STATUS_MUTATION } from '@/lib/graphql';
+import {
+  GET_USERS_QUERY,
+  CREATE_USER_MUTATION,
+  UPDATE_USER_MUTATION,
+  UPDATE_USER_STATUS_MUTATION,
+  DELETE_USER_MUTATION
+} from '@/lib/graphql';
 import { useToast } from '@/context/toast-context';
 import { UserRole, UserStatus, UsersConnection } from '@/types/graphql';
 
 interface CreateUserInput {
   username: string;
-  email: string;
   password: string;
   role: UserRole;
+}
+
+interface UpdateUserInput {
+  email?: string;
+  phone?: string;
+  emailNotifications?: boolean;
+  whatsappNotifications?: boolean;
 }
 
 export const useUserManagement = () => {
@@ -32,6 +44,14 @@ export const useUserManagement = () => {
   });
 
   const [updateUserStatusMutation, { loading: updating }] = useMutation(UPDATE_USER_STATUS_MUTATION, {
+    refetchQueries: [{ query: GET_USERS_QUERY }],
+  });
+
+  const [updateUserMutation, { loading: updatingUser }] = useMutation(UPDATE_USER_MUTATION, {
+    refetchQueries: [{ query: GET_USERS_QUERY }],
+  });
+
+  const [deleteUserMutation, { loading: deleting }] = useMutation(DELETE_USER_MUTATION, {
     refetchQueries: [{ query: GET_USERS_QUERY }],
   });
 
@@ -69,6 +89,35 @@ export const useUserManagement = () => {
     }
   };
 
+  const updateUser = async (userId: string, input: UpdateUserInput) => {
+    try {
+      await updateUserMutation({
+        variables: {
+          id: userId,
+          input,
+        },
+      });
+      success('Utilisateur modifié', 'Les informations de l\'utilisateur ont été mises à jour');
+      return true;
+    } catch (err) {
+      error('Erreur', err instanceof Error ? err.message : 'Impossible de modifier l\'utilisateur');
+      return false;
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    try {
+      await deleteUserMutation({
+        variables: { id: userId },
+      });
+      success('Utilisateur supprimé', 'L\'utilisateur a été supprimé avec succès');
+      return true;
+    } catch (err) {
+      error('Erreur', err instanceof Error ? err.message : 'Impossible de supprimer l\'utilisateur');
+      return false;
+    }
+  };
+
   const users = data?.users.edges.map(edge => edge.node) || [];
   const totalCount = data?.users.totalCount || 0;
 
@@ -78,11 +127,15 @@ export const useUserManagement = () => {
     loading,
     creating,
     updating,
+    updatingUser,
+    deleting,
     filterRole,
     filterStatus,
     setFilterRole,
     setFilterStatus,
     createUser,
+    updateUser,
+    deleteUser,
     toggleUserStatus,
   };
 };
