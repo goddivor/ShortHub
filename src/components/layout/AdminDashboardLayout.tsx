@@ -8,6 +8,7 @@ import {
   Home,
   User,
   VideoPlay,
+  Youtube,
   HambergerMenu,
   CloseSquare,
   Chart,
@@ -45,10 +46,16 @@ const AdminDashboardLayout: React.FC = () => {
       description: 'Gérer les utilisateurs',
     },
     {
-      path: '/admin/channels',
-      label: 'Chaînes',
+      path: '/admin/source-channels',
+      label: 'Chaînes Sources',
       icon: <VideoPlay color="#FF0000" size={20} className="text-red-600" />,
-      description: 'Gérer les chaînes',
+      description: 'Chaînes sources',
+    },
+    {
+      path: '/admin/publication-channels',
+      label: 'Chaînes Pub.',
+      icon: <Youtube color="#FF0000" size={20} className="text-red-600" />,
+      description: 'Chaînes de publication',
     },
     {
       path: '/admin/rolling',
