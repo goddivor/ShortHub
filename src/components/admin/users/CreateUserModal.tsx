@@ -2,11 +2,10 @@
 import React, { useState } from 'react';
 import { UserRole } from '@/types/graphql';
 import SpinLoader from '@/components/SpinLoader';
-import { CloseCircle, User, Sms, Lock, Profile2User } from 'iconsax-react';
+import { CloseCircle, User, Lock, Profile2User } from 'iconsax-react';
 
 interface CreateUserFormData {
   username: string;
-  email: string;
   password: string;
   role: UserRole;
 }
@@ -26,7 +25,6 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<CreateUserFormData>({
     username: '',
-    email: '',
     password: '',
     role: UserRole.VIDEASTE,
   });
@@ -38,7 +36,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
     try {
       const success = await onSubmit(formData);
       if (success) {
-        setFormData({ username: '', email: '', password: '', role: UserRole.VIDEASTE });
+        setFormData({ username: '', password: '', role: UserRole.VIDEASTE });
         onClose();
       }
     } finally {
@@ -48,7 +46,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
   const handleClose = () => {
     if (!localSubmitting && !isSubmitting) {
-      setFormData({ username: '', email: '', password: '', role: UserRole.VIDEASTE });
+      setFormData({ username: '', password: '', role: UserRole.VIDEASTE });
       onClose();
     }
   };
@@ -78,7 +76,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
             </button>
           </div>
           <p className="text-red-100 text-sm mt-2">
-            Créer un nouveau compte utilisateur dans le système
+            L'utilisateur pourra connecter son email et WhatsApp après la création
           </p>
         </div>
 
@@ -99,27 +97,6 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 placeholder="Ex: john_doe"
-                required
-                disabled={submitting}
-              />
-            </div>
-          </div>
-
-          {/* Email Field */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Adresse email *
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Sms size={18} color="#9CA3AF" variant="Bold" />
-              </div>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                placeholder="Ex: john@example.com"
                 required
                 disabled={submitting}
               />

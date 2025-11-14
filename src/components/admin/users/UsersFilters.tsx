@@ -3,6 +3,7 @@ import React from 'react';
 import { UserRole, UserStatus } from '@/types/graphql';
 import { Filter } from 'iconsax-react';
 
+// Props for UsersFilters component
 interface UsersFiltersProps {
   filterRole: UserRole | '';
   filterStatus: UserStatus | '';
