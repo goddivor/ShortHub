@@ -743,6 +743,47 @@ export const GET_ADMIN_CHANNELS_QUERY = gql`
   }
 `;
 
+// ============================================
+// ADMIN DASHBOARD - Requête optimisée combinée
+// ============================================
+
+export const GET_ADMIN_DASHBOARD_STATS_QUERY = gql`
+  query GetAdminDashboardStats {
+    sourceChannels {
+      id
+      channelId
+      channelName
+      profileImageUrl
+      contentType
+      totalVideos
+      createdAt
+    }
+    adminChannels {
+      id
+      channelId
+      channelName
+      profileImageUrl
+      totalVideos
+      subscriberCount
+      shortsAssigned {
+        id
+      }
+      createdAt
+    }
+    users {
+      totalCount
+      edges {
+        node {
+          id
+          username
+          role
+          status
+        }
+      }
+    }
+  }
+`;
+
 export const GET_ADMIN_CHANNEL_QUERY = gql`
   query GetAdminChannel($id: ID!) {
     adminChannel(id: $id) {
