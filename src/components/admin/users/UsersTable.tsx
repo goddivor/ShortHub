@@ -132,8 +132,16 @@ const UsersTable: React.FC<UsersTableProps> = ({
                 {/* User Info */}
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-md">
-                      {user.username.charAt(0).toUpperCase()}
+                    <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-md overflow-hidden">
+                      {user.profileImage ? (
+                        <img
+                          src={user.profileImage}
+                          alt={user.username}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        user.username.charAt(0).toUpperCase()
+                      )}
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900">{user.username}</p>
