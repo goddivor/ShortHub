@@ -38,6 +38,7 @@ export const ME_QUERY = gql`
       role
       status
       phone
+      profileImage
       emailNotifications
       whatsappNotifications
       createdAt
@@ -480,6 +481,7 @@ export const GET_USERS_QUERY = gql`
           role
           status
           phone
+          profileImage
           emailNotifications
           whatsappNotifications
           createdAt
@@ -533,6 +535,32 @@ export const UPDATE_USER_MUTATION = gql`
 export const DELETE_USER_MUTATION = gql`
   mutation DeleteUser($id: ID!) {
     deleteUser(id: $id)
+  }
+`;
+
+export const CHANGE_USER_PASSWORD_MUTATION = gql`
+  mutation AdminChangeUserPassword($userId: ID!, $newPassword: String!) {
+    adminChangeUserPassword(userId: $userId, newPassword: $newPassword)
+  }
+`;
+
+export const UPLOAD_PROFILE_IMAGE_MUTATION = gql`
+  mutation UploadProfileImage($base64Image: String!) {
+    uploadProfileImage(base64Image: $base64Image) {
+      id
+      username
+      profileImage
+    }
+  }
+`;
+
+export const REMOVE_PROFILE_IMAGE_MUTATION = gql`
+  mutation RemoveProfileImage {
+    removeProfileImage {
+      id
+      username
+      profileImage
+    }
   }
 `;
 

@@ -21,6 +21,7 @@ const AdminUsersPage: React.FC = () => {
     creating,
     updatingUser,
     deleting,
+    changingPassword,
     filterRole,
     filterStatus,
     setFilterRole,
@@ -28,6 +29,7 @@ const AdminUsersPage: React.FC = () => {
     createUser,
     updateUser,
     deleteUser,
+    changeUserPassword,
     toggleUserStatus,
   } = useUserManagement();
 
@@ -63,6 +65,11 @@ const AdminUsersPage: React.FC = () => {
       setShowDeleteModal(false);
       setSelectedUser(null);
     }
+    return success;
+  };
+
+  const handleChangePassword = async (userId: string, newPassword: string) => {
+    const success = await changeUserPassword(userId, newPassword);
     return success;
   };
 
@@ -177,7 +184,8 @@ const AdminUsersPage: React.FC = () => {
           setSelectedUser(null);
         }}
         onSubmit={handleEditUser}
-        isSubmitting={updatingUser}
+        onPasswordChange={handleChangePassword}
+        isSubmitting={updatingUser || changingPassword}
       />
 
       {/* Delete User Modal */}

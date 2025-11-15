@@ -6,7 +6,8 @@ import {
   CREATE_USER_MUTATION,
   UPDATE_USER_MUTATION,
   UPDATE_USER_STATUS_MUTATION,
-  DELETE_USER_MUTATION
+  DELETE_USER_MUTATION,
+  CHANGE_USER_PASSWORD_MUTATION
 } from '@/lib/graphql';
 import { useToast } from '@/context/toast-context';
 import { UserRole, UserStatus, UsersConnection } from '@/types/graphql';
@@ -52,6 +53,10 @@ export const useUserManagement = () => {
   });
 
   const [deleteUserMutation, { loading: deleting }] = useMutation(DELETE_USER_MUTATION, {
+    refetchQueries: [{ query: GET_USERS_QUERY }],
+  });
+
+  const [changeUserPasswordMutation, { loading: changingPassword }] = useMutation(CHANGE_USER_PASSWORD_MUTATION, {
     refetchQueries: [{ query: GET_USERS_QUERY }],
   });
 
@@ -118,6 +123,22 @@ export const useUserManagement = () => {
     }
   };
 
+  const changeUserPassword = async (userId: string, newPassword: string) => {
+    try {
+      await changeUserPasswordMutation({
+        variables: {
+          userId,
+          newPassword,
+        },
+      });
+      success('Mot de passe modifié', 'Le mot de passe de l\'utilisateur a été changé avec succès');
+      return true;
+    } catch (err) {
+      error('Erreur', err instanceof Error ? err.message : 'Impossible de modifier le mot de passe');
+      return false;
+    }
+  };
+
   const users = data?.users.edges.map(edge => edge.node) || [];
   const totalCount = data?.users.totalCount || 0;
 
@@ -129,6 +150,7 @@ export const useUserManagement = () => {
     updating,
     updatingUser,
     deleting,
+    changingPassword,
     filterRole,
     filterStatus,
     setFilterRole,
@@ -136,6 +158,7 @@ export const useUserManagement = () => {
     createUser,
     updateUser,
     deleteUser,
+    changeUserPassword,
     toggleUserStatus,
   };
 };
