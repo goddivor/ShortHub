@@ -18,6 +18,7 @@ import AdminCalendarPage from "./admin/AdminCalendarPage";
 import AdminAnalyticsPage from "./admin/AdminAnalyticsPage";
 import AdminActivityPage from "./admin/AdminActivityPage";
 import AdminSettingsPage from "./admin/AdminSettingsPage";
+import AdminProfilePage from "./admin/AdminProfilePage";
 import { VideasteDashboardPage } from "./videaste";
 import { AssistantDashboardPage } from "./assistant";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -58,9 +59,10 @@ const router = createBrowserRouter([
           { path: "publication-channels", element: <AdminPublicationChannelsPage /> },
           { path: "rolling", element: <AdminRollingPage /> },
           { path: "calendar", element: <AdminCalendarPage /> },
-          { path: "analytics", element: <AdminAnalyticsPage /> },
+          { path: "notifications", element: <AdminAnalyticsPage /> }, // Placeholder - will create later
           { path: "activity", element: <AdminActivityPage /> },
           { path: "settings", element: <AdminSettingsPage /> },
+          { path: "profile", element: <AdminProfilePage /> },
         ],
       },
 

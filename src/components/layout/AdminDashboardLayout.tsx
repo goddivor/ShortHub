@@ -11,12 +11,13 @@ import {
   Youtube,
   HambergerMenu,
   CloseSquare,
-  Chart,
   TrendUp,
   Logout,
   Setting,
   Activity,
   Calendar,
+  Notification,
+  UserTag,
 } from 'iconsax-react';
 
 interface SidebarItem {
@@ -71,10 +72,10 @@ const AdminDashboardLayout: React.FC = () => {
       description: 'Planning des shorts',
     },
     {
-      path: '/admin/analytics',
-      label: 'Analytics',
-      icon: <Chart color="#FF0000" size={20} className="text-red-600" />,
-      description: 'Statistiques',
+      path: '/admin/notifications',
+      label: 'Notifications',
+      icon: <Notification color="#FF0000" size={20} className="text-red-600" />,
+      description: 'Centre de notifications',
     },
     {
       path: '/admin/activity',
@@ -247,8 +248,16 @@ const AdminDashboardLayout: React.FC = () => {
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
                     className="flex items-center gap-2 hover:bg-gray-50 rounded-lg p-2 transition-colors"
                   >
-                    <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                      <User color="#FF0000" size={16} className="text-red-600" />
+                    <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center overflow-hidden">
+                      {user?.profileImage ? (
+                        <img
+                          src={user.profileImage}
+                          alt={user.username}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User color="#FF0000" size={16} className="text-red-600" />
+                      )}
                     </div>
                     <div className="hidden sm:block text-left">
                       <p className="text-sm font-medium text-gray-700">{user?.username}</p>
@@ -258,19 +267,55 @@ const AdminDashboardLayout: React.FC = () => {
 
                   {/* Dropdown Menu */}
                   {userMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                      <div className="px-4 py-2 border-b border-gray-200">
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                      <div className="px-4 py-3 border-b border-gray-200">
                         <p className="text-sm font-medium text-gray-900">{user?.username}</p>
-                        <p className="text-xs text-gray-500">{user?.email}</p>
+                        <p className="text-xs text-gray-500">{user?.role}</p>
                       </div>
+
+                      <button
+                        onClick={() => {
+                          navigate('/admin/profile');
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <UserTag size={18} color="#374151" variant="Bold" />
+                        <span>Profil</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          navigate('/admin/notifications');
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <Notification size={18} color="#374151" variant="Bold" />
+                        <span>Notifications</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          navigate('/admin/settings');
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <Setting size={18} color="#374151" variant="Bold" />
+                        <span>Configuration</span>
+                      </button>
+
+                      <div className="border-t border-gray-200 my-1"></div>
+
                       <button
                         onClick={() => {
                           logout();
                           setUserMenuOpen(false);
                         }}
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                       >
-                        <Logout size={16} />
+                        <Logout size={18} color="#DC2626" variant="Bold" />
                         <span>Déconnexion</span>
                       </button>
                     </div>
