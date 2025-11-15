@@ -8,6 +8,7 @@ import {
 import { Short, UserRole, AdminChannel, ContentType, User as UserType } from '@/types/graphql';
 import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
+import CustomSelect, { CustomSelectOption } from '@/components/ui/CustomSelect';
 import { CloseCircle, User, Youtube, Calendar, DocumentText, Send2 } from 'iconsax-react';
 
 interface AssignShortModalProps {
@@ -118,6 +119,22 @@ export default function AssignShortModal({ isOpen, onClose, short, onAssigned }:
   const videasts = (usersData as { users?: { edges?: { node: UserType }[] } })?.users?.edges?.map((edge) => edge.node) || [];
   const loading = usersLoading || channelsLoading;
 
+  // Préparer les options pour CustomSelect (vidéastes)
+  const videasteOptions: CustomSelectOption[] = videasts.map((videaste) => ({
+    id: videaste.id,
+    name: videaste.username,
+    profileImage: videaste.profileImage,
+    type: 'user' as const,
+  }));
+
+  // Préparer les options pour CustomSelect (chaînes)
+  const channelOptions: CustomSelectOption[] = matchingChannels.map((channel) => ({
+    id: channel.id,
+    name: `${channel.channelName} - ${getContentTypeLabel(channel.contentType)}`,
+    imageUrl: channel.imageUrl,
+    type: 'channel' as const,
+  }));
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -195,20 +212,14 @@ export default function AssignShortModal({ isOpen, onClose, short, onAssigned }:
                     <span>Vidéaste *</span>
                   </div>
                 </label>
-                <select
+                <CustomSelect
+                  options={videasteOptions}
                   value={selectedVideaste}
-                  onChange={(e) => setSelectedVideaste(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                  required
+                  onChange={setSelectedVideaste}
+                  placeholder="Sélectionner un vidéaste"
                   disabled={assignLoading}
-                >
-                  <option value="">Sélectionner un vidéaste</option>
-                  {videasts.map((videaste: UserType) => (
-                    <option key={videaste.id} value={videaste.id}>
-                      {videaste.username}
-                    </option>
-                  ))}
-                </select>
+                  required
+                />
                 {videasts.length === 0 && (
                   <p className="text-xs text-red-600 mt-1">
                     Aucun vidéaste disponible. Créez des comptes vidéastes d'abord.
@@ -224,20 +235,14 @@ export default function AssignShortModal({ isOpen, onClose, short, onAssigned }:
                     <span>Chaîne de publication *</span>
                   </div>
                 </label>
-                <select
+                <CustomSelect
+                  options={channelOptions}
                   value={selectedChannel}
-                  onChange={(e) => setSelectedChannel(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                  required
+                  onChange={setSelectedChannel}
+                  placeholder="Sélectionner une chaîne"
                   disabled={assignLoading}
-                >
-                  <option value="">Sélectionner une chaîne</option>
-                  {matchingChannels.map((channel) => (
-                    <option key={channel.id} value={channel.id}>
-                      {channel.channelName} - {getContentTypeLabel(channel.contentType)}
-                    </option>
-                  ))}
-                </select>
+                  required
+                />
                 {matchingChannels.length === 0 && (
                   <p className="text-xs text-orange-600 mt-1">
                     Aucune chaîne de publication de type "{getContentTypeLabel(short.sourceChannel.contentType)}" disponible.
