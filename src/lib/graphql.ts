@@ -38,6 +38,7 @@ export const ME_QUERY = gql`
       role
       status
       phone
+      whatsappLinked
       profileImage
       emailNotifications
       whatsappNotifications
@@ -526,6 +527,7 @@ export const UPDATE_USER_MUTATION = gql`
       username
       email
       phone
+      whatsappLinked
       emailNotifications
       whatsappNotifications
     }
@@ -677,6 +679,9 @@ export const GET_SOURCE_CHANNELS_QUERY = gql`
       profileImageUrl
       contentType
       totalVideos
+      shortsRolled {
+        id
+      }
       createdAt
       updatedAt
     }

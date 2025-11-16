@@ -253,7 +253,7 @@ export default function AdminPublicationChannelsPage() {
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="text-gray-900 font-medium">{channel.shortsAssigned?.length || 0}</span>
+                      <span className="text-gray-900 font-medium">{channel.stats?.totalShortsPublished || 0}</span>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex justify-end gap-2">
