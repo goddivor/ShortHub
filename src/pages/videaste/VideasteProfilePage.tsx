@@ -160,6 +160,7 @@ const VideasteProfilePage: React.FC = () => {
           input: {
             email: email || null,
             phone: phone || null,
+            whatsappLinked: !!phone, // Automatiquement lié si numéro fourni
             emailNotifications,
             whatsappNotifications,
           }
