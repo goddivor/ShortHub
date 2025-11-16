@@ -577,11 +577,23 @@ export const GET_NOTIFICATIONS_QUERY = gql`
           id
           type
           message
-          video {
+          short {
             id
+            videoId
             title
+            sourceChannel {
+              id
+              channelName
+            }
           }
+          sentViaEmail
+          sentViaWhatsApp
+          sentViaPlatform
+          emailSentAt
+          whatsappSentAt
+          platformSentAt
           read
+          readAt
           createdAt
         }
       }
@@ -618,49 +630,36 @@ export const MARK_ALL_NOTIFICATIONS_AS_READ_MUTATION = gql`
   }
 `;
 
+export const DELETE_NOTIFICATION_MUTATION = gql`
+  mutation DeleteNotification($id: ID!) {
+    deleteNotification(id: $id)
+  }
+`;
+
 // ============================================
-// SUBSCRIPTIONS
+// NOTIFICATION SETTINGS (Global Admin)
 // ============================================
 
-export const NOTIFICATION_RECEIVED_SUBSCRIPTION = gql`
-  subscription NotificationReceived($userId: ID!) {
-    notificationReceived(userId: $userId) {
+export const GET_NOTIFICATION_SETTINGS_QUERY = gql`
+  query GetNotificationSettings {
+    notificationSettings {
       id
-      type
-      message
-      video {
-        id
-        title
-      }
-      read
-      createdAt
+      platformNotificationsEnabled
+      emailNotificationsEnabled
+      whatsappNotificationsEnabled
+      updatedAt
     }
   }
 `;
 
-export const VIDEO_STATUS_CHANGED_SUBSCRIPTION = gql`
-  subscription VideoStatusChanged($videoId: ID) {
-    videoStatusChanged(videoId: $videoId) {
+export const UPDATE_NOTIFICATION_SETTINGS_MUTATION = gql`
+  mutation UpdateNotificationSettings($input: UpdateNotificationSettingsInput!) {
+    updateNotificationSettings(input: $input) {
       id
-      status
-      completedAt
-      validatedAt
-      publishedAt
-    }
-  }
-`;
-
-export const VIDEO_ASSIGNED_SUBSCRIPTION = gql`
-  subscription VideoAssigned($userId: ID!) {
-    videoAssigned(userId: $userId) {
-      id
-      title
-      assignedTo {
-        id
-        username
-      }
-      scheduledDate
-      status
+      platformNotificationsEnabled
+      emailNotificationsEnabled
+      whatsappNotificationsEnabled
+      updatedAt
     }
   }
 `;
@@ -1150,6 +1149,69 @@ export const GET_SHORTS_STATS_QUERY = gql`
       totalCompleted
       totalValidated
       totalPublished
+    }
+  }
+`;
+
+// ============================================
+// VIDEASTE QUERIES
+// ============================================
+
+export const GET_MY_SHORTS_QUERY = gql`
+  query GetMyShorts($filter: ShortFilterInput) {
+    shorts(filter: $filter) {
+      id
+      videoId
+      videoUrl
+      status
+      title
+      description
+      tags
+      rolledAt
+      assignedAt
+      deadline
+      completedAt
+      notes
+      adminFeedback
+      sourceChannel {
+        id
+        channelName
+        profileImageUrl
+        contentType
+      }
+      targetChannel {
+        id
+        channelName
+        profileImageUrl
+        contentType
+      }
+      assignedBy {
+        id
+        username
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const START_SHORT_MUTATION = gql`
+  mutation StartShort($shortId: ID!) {
+    updateShortStatus(input: { shortId: $shortId, status: IN_PROGRESS }) {
+      id
+      status
+      updatedAt
+    }
+  }
+`;
+
+export const COMPLETE_SHORT_MUTATION = gql`
+  mutation CompleteShort($shortId: ID!) {
+    updateShortStatus(input: { shortId: $shortId, status: COMPLETED }) {
+      id
+      status
+      completedAt
+      updatedAt
     }
   }
 `;

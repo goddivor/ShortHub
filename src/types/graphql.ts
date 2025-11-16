@@ -73,13 +73,24 @@ export enum VideoStatus {
 }
 
 export enum NotificationType {
-  VIDEO_ASSIGNED = 'VIDEO_ASSIGNED',
-  DEADLINE_REMINDER = 'DEADLINE_REMINDER',
-  VIDEO_COMPLETED = 'VIDEO_COMPLETED',
-  VIDEO_VALIDATED = 'VIDEO_VALIDATED',
-  VIDEO_REJECTED = 'VIDEO_REJECTED',
-  ACCOUNT_BLOCKED = 'ACCOUNT_BLOCKED',
-  ACCOUNT_UNBLOCKED = 'ACCOUNT_UNBLOCKED',
+  // Workflow Shorts - Vidéaste
+  SHORT_ASSIGNED = 'SHORT_ASSIGNED',                      // Nouveau short assigné
+  SHORT_DEADLINE_REMINDER = 'SHORT_DEADLINE_REMINDER',    // Rappel 24h avant deadline
+  SHORT_LATE = 'SHORT_LATE',                              // Short en retard
+
+  // Workflow Shorts - Admin
+  SHORT_COMPLETED = 'SHORT_COMPLETED',                    // Vidéaste a terminé
+  SHORT_VALIDATED = 'SHORT_VALIDATED',                    // Admin a validé
+  SHORT_REJECTED = 'SHORT_REJECTED',                      // Admin a rejeté
+  SHORT_PUBLISHED = 'SHORT_PUBLISHED',                    // Short publié
+
+  // Gestion utilisateurs
+  ACCOUNT_CREATED = 'ACCOUNT_CREATED',                    // Compte créé
+  ACCOUNT_BLOCKED = 'ACCOUNT_BLOCKED',                    // Compte bloqué
+  ACCOUNT_UNBLOCKED = 'ACCOUNT_UNBLOCKED',                // Compte débloqué
+
+  // Commentaires
+  SHORT_COMMENT_ADDED = 'SHORT_COMMENT_ADDED',            // Nouveau commentaire
 }
 
 // ============================================
@@ -262,12 +273,14 @@ export interface Notification {
   id: string;
   recipient: User;
   type: NotificationType;
-  video?: Video;
+  short?: Short;                // Référence au short concerné
   message: string;
   sentViaEmail: boolean;
   sentViaWhatsApp: boolean;
+  sentViaPlatform: boolean;     // Notification sur la plateforme
   emailSentAt?: string;
   whatsappSentAt?: string;
+  platformSentAt?: string;
   read: boolean;
   readAt?: string;
   createdAt: string;
@@ -484,6 +497,21 @@ export interface ShortsStats {
   totalCompleted: number;
   totalValidated: number;
   totalPublished: number;
+}
+
+// Notification Settings (Global Admin Settings)
+export interface NotificationSettings {
+  id: string;
+  platformNotificationsEnabled: boolean;  // Kill switch pour notifications plateforme
+  emailNotificationsEnabled: boolean;     // Kill switch pour notifications email
+  whatsappNotificationsEnabled: boolean;  // Kill switch pour notifications WhatsApp
+  updatedAt: string;
+}
+
+export interface UpdateNotificationSettingsInput {
+  platformNotificationsEnabled?: boolean;
+  emailNotificationsEnabled?: boolean;
+  whatsappNotificationsEnabled?: boolean;
 }
 
 // Utility types
