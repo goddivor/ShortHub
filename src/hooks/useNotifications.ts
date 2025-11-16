@@ -1,11 +1,10 @@
 // src/hooks/useNotifications.ts
-import { useQuery, useMutation, useSubscription } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import {
   GET_NOTIFICATIONS_QUERY,
   GET_UNREAD_NOTIFICATIONS_COUNT_QUERY,
   MARK_NOTIFICATION_AS_READ_MUTATION,
   MARK_ALL_NOTIFICATIONS_AS_READ_MUTATION,
-  NOTIFICATION_RECEIVED_SUBSCRIPTION,
 } from '@/lib/graphql';
 import type {
   Notification,
@@ -113,22 +112,6 @@ export const useMarkAllNotificationsAsRead = () => {
 
   return {
     markAllAsRead,
-    loading,
-    error,
-  };
-};
-
-// Hook to subscribe to real-time notifications
-export const useNotificationSubscription = (userId: string) => {
-  const { data, loading, error } = useSubscription<{
-    notificationReceived: Notification;
-  }>(NOTIFICATION_RECEIVED_SUBSCRIPTION, {
-    variables: { userId },
-    skip: !userId,
-  });
-
-  return {
-    notification: data?.notificationReceived || null,
     loading,
     error,
   };
