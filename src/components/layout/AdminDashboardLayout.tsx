@@ -1,9 +1,12 @@
 // src/components/layout/AdminDashboardLayout.tsx
 import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router';
+import { useQuery } from '@apollo/client/react';
 import Logo from '@/components/ui/logo';
 import Button from '@/components/Button';
 import { useAuth } from '@/hooks/useAuth';
+import NotificationDropdown from '@/components/notifications/NotificationDropdown';
+import { GET_UNREAD_NOTIFICATIONS_COUNT_QUERY } from '@/lib/graphql';
 import {
   Home,
   User,
@@ -14,10 +17,10 @@ import {
   TrendUp,
   Logout,
   Setting,
-  Activity,
   Calendar,
-  Notification,
   UserTag,
+  TaskSquare,
+  Notification,
 } from 'iconsax-react';
 
 interface SidebarItem {
@@ -33,6 +36,14 @@ const AdminDashboardLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const [notificationOpen, setNotificationOpen] = React.useState(false);
+
+  // Fetch unread notifications count
+  const { data: countData } = useQuery(GET_UNREAD_NOTIFICATIONS_COUNT_QUERY, {
+    pollInterval: 30000, // Rafraîchir toutes les 30 secondes
+  });
+
+  const unreadCount = countData?.unreadNotificationsCount || 0;
 
   const sidebarItems: SidebarItem[] = [
     {
@@ -66,22 +77,16 @@ const AdminDashboardLayout: React.FC = () => {
       description: 'Roll & Assignation',
     },
     {
+      path: '/admin/shorts-tracking',
+      label: 'Suivi des Shorts',
+      icon: <TaskSquare color="#FF0000" size={20} className="text-red-600" />,
+      description: 'Tracking & Validation',
+    },
+    {
       path: '/admin/calendar',
       label: 'Calendrier',
       icon: <Calendar color="#FF0000" size={20} className="text-red-600" />,
       description: 'Planning des shorts',
-    },
-    {
-      path: '/admin/notifications',
-      label: 'Notifications',
-      icon: <Notification color="#FF0000" size={20} className="text-red-600" />,
-      description: 'Centre de notifications',
-    },
-    {
-      path: '/admin/activity',
-      label: 'Activité',
-      icon: <Activity color="#FF0000" size={20} className="text-red-600" />,
-      description: 'Logs d\'activité',
     },
     {
       path: '/admin/settings',
@@ -242,6 +247,28 @@ const AdminDashboardLayout: React.FC = () => {
 
               {/* Header Actions */}
               <div className="flex items-center gap-4">
+                {/* Notifications */}
+                <div className="relative">
+                  <button
+                    onClick={() => setNotificationOpen(!notificationOpen)}
+                    className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <Notification size={24} color="#374151" variant="Bold" />
+                    {/* Badge de notification */}
+                    {unreadCount > 0 && (
+                      <span className="absolute top-0 right-0 px-1.5 min-w-[20px] h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Notification Dropdown */}
+                  <NotificationDropdown
+                    isOpen={notificationOpen}
+                    onClose={() => setNotificationOpen(false)}
+                  />
+                </div>
+
                 {/* User Menu */}
                 <div className="relative">
                   <button
@@ -282,17 +309,6 @@ const AdminDashboardLayout: React.FC = () => {
                       >
                         <UserTag size={18} color="#374151" variant="Bold" />
                         <span>Profil</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          navigate('/admin/notifications');
-                          setUserMenuOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        <Notification size={18} color="#374151" variant="Bold" />
-                        <span>Notifications</span>
                       </button>
 
                       <button

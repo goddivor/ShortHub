@@ -3,10 +3,11 @@ import RootLayout from "@/app.layout";
 import NotFound from "./NotFound";
 import LandingPage from "./LandingPage";
 import LoginPage from "./LoginPage";
-import AddChannelPage from "./AddChannelPage";
-import RollShortsPage from "./RollShortsPage";
+// import AddChannelPage from "./AddChannelPage";
+// import RollShortsPage from "./RollShortsPage";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import AdminDashboardLayout from "@/components/layout/AdminDashboardLayout";
+import VideasteDashboardLayout from "@/components/layout/VideasteDashboardLayout";
 import DashboardPage from "./DashboardPage";
 import DashboardRedirectPage from "./DashboardRedirectPage";
 import AdminDashboardPage from "./admin/AdminDashboardPage";
@@ -15,11 +16,10 @@ import AdminSourceChannelsPage from "./admin/AdminSourceChannelsPage";
 import AdminPublicationChannelsPage from "./admin/AdminPublicationChannelsPage";
 import AdminRollingPage from "./admin/AdminRollingPage";
 import AdminCalendarPage from "./admin/AdminCalendarPage";
-import AdminAnalyticsPage from "./admin/AdminAnalyticsPage";
-import AdminActivityPage from "./admin/AdminActivityPage";
 import AdminSettingsPage from "./admin/AdminSettingsPage";
 import AdminProfilePage from "./admin/AdminProfilePage";
-import { VideasteDashboardPage } from "./videaste";
+import AdminShortsTrackingPage from "./admin/AdminShortsTrackingPage";
+import { VideasteDashboardPage, VideasteShortsPage, VideasteCalendarPage, VideasteProfilePage } from "./videaste";
 import { AssistantDashboardPage } from "./assistant";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { UserRole } from "@/types/graphql";
@@ -58,9 +58,8 @@ const router = createBrowserRouter([
           { path: "source-channels", element: <AdminSourceChannelsPage /> },
           { path: "publication-channels", element: <AdminPublicationChannelsPage /> },
           { path: "rolling", element: <AdminRollingPage /> },
+          { path: "shorts-tracking", element: <AdminShortsTrackingPage /> },
           { path: "calendar", element: <AdminCalendarPage /> },
-          { path: "notifications", element: <AdminAnalyticsPage /> }, // Placeholder - will create later
-          { path: "activity", element: <AdminActivityPage /> },
           { path: "settings", element: <AdminSettingsPage /> },
           { path: "profile", element: <AdminProfilePage /> },
         ],
@@ -71,16 +70,15 @@ const router = createBrowserRouter([
         path: "/videaste",
         element: (
           <ProtectedRoute requireRole={UserRole.VIDEASTE}>
-            <DashboardLayout />
+            <VideasteDashboardLayout />
           </ProtectedRoute>
         ),
         children: [
           { path: "", element: <VideasteDashboardPage /> },
           { path: "dashboard", element: <VideasteDashboardPage /> },
-          { path: "videos", element: <DashboardPage /> }, // Placeholder - will create later
-          { path: "calendar", element: <DashboardPage /> }, // Placeholder - will create later
-          { path: "add-channel", element: <AddChannelPage /> },
-          { path: "roll-shorts", element: <RollShortsPage /> },
+          { path: "shorts", element: <VideasteShortsPage /> },
+          { path: "calendar", element: <VideasteCalendarPage /> },
+          { path: "profile", element: <VideasteProfilePage /> },
         ],
       },
 

@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useMutation } from '@apollo/client/react';
-import { UPLOAD_PROFILE_IMAGE_MUTATION, REMOVE_PROFILE_IMAGE_MUTATION } from '@/lib/graphql';
+import { UPLOAD_PROFILE_IMAGE_MUTATION, REMOVE_PROFILE_IMAGE_MUTATION, UPDATE_USER_MUTATION } from '@/lib/graphql';
 import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
 import {
@@ -16,7 +16,11 @@ import {
   Whatsapp,
   Shield,
   Camera,
-  Trash
+  Trash,
+  Notification,
+  Mobile,
+  Verify,
+  CloseCircle
 } from 'iconsax-react';
 
 const AdminProfilePage: React.FC = () => {
@@ -32,6 +36,13 @@ const AdminProfilePage: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Notification settings state
+  const [isEditingNotifications, setIsEditingNotifications] = useState(false);
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [emailNotifications, setEmailNotifications] = useState(user?.emailNotifications || false);
+  const [whatsappNotifications, setWhatsappNotifications] = useState(user?.whatsappNotifications || false);
+
   const [uploadProfileImage, { loading: uploadingImage }] = useMutation(UPLOAD_PROFILE_IMAGE_MUTATION, {
     onCompleted: async () => {
       await refetchUser();
@@ -40,6 +51,17 @@ const AdminProfilePage: React.FC = () => {
   const [removeProfileImage, { loading: removingImage }] = useMutation(REMOVE_PROFILE_IMAGE_MUTATION, {
     onCompleted: async () => {
       await refetchUser();
+    }
+  });
+
+  const [updateUser, { loading: updatingUser }] = useMutation(UPDATE_USER_MUTATION, {
+    onCompleted: async () => {
+      await refetchUser();
+      success('Paramètres mis à jour', 'Vos paramètres de notifications ont été mis à jour avec succès');
+      setIsEditingNotifications(false);
+    },
+    onError: (err) => {
+      error('Erreur', err.message || 'Impossible de mettre à jour les paramètres');
     }
   });
 
@@ -77,7 +99,7 @@ const AdminProfilePage: React.FC = () => {
       };
 
       reader.readAsDataURL(file);
-    } catch (err) {
+    } catch {
       error('Erreur', 'Erreur lors de la lecture du fichier');
     }
   };
@@ -115,12 +137,53 @@ const AdminProfilePage: React.FC = () => {
       setConfirmPassword('');
       setIsEditingPassword(false);
       success('Mot de passe modifié', 'Votre mot de passe a été modifié avec succès');
-    } catch (err) {
+    } catch {
       error('Erreur', 'Erreur lors de la modification du mot de passe');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleNotificationSettingsSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validation
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      error('Erreur', 'Veuillez entrer une adresse email valide');
+      return;
+    }
+
+    if (phone && !/^[+]?[\d\s()-]+$/.test(phone)) {
+      error('Erreur', 'Veuillez entrer un numéro de téléphone valide');
+      return;
+    }
+
+    try {
+      await updateUser({
+        variables: {
+          id: user?.id,
+          input: {
+            email: email || null,
+            phone: phone || null,
+            emailNotifications,
+            whatsappNotifications,
+          }
+        }
+      });
+    } catch {
+      // Error handled in mutation onError
+    }
+  };
+
+  // Update state when user changes
+  React.useEffect(() => {
+    if (user) {
+      setEmail(user.email || '');
+      setPhone(user.phone || '');
+      setEmailNotifications(user.emailNotifications || false);
+      setWhatsappNotifications(user.whatsappNotifications || false);
+    }
+  }, [user]);
 
   if (!user) {
     return (
@@ -410,6 +473,204 @@ const AdminProfilePage: React.FC = () => {
                     <>
                       <TickCircle size={18} color="white" variant="Bold" />
                       <span>Modifier le mot de passe</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+
+      {/* Notification Settings Card */}
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-50 to-purple-100 px-6 py-4 border-b border-purple-200">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <Notification size={20} color="#111827" variant="Bold" />
+            Paramètres de notifications
+          </h2>
+        </div>
+
+        <div className="p-6">
+          {!isEditingNotifications ? (
+            <div className="space-y-4">
+              {/* Current Settings Display */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Email Status */}
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">Email</span>
+                    {email ? (
+                      <Verify size={18} color="#10B981" variant="Bold" />
+                    ) : (
+                      <CloseCircle size={18} color="#EF4444" variant="Bold" />
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-900">{email || 'Non configuré'}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Notifications: {emailNotifications ? 'Activées' : 'Désactivées'}
+                  </p>
+                </div>
+
+                {/* WhatsApp Status */}
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">WhatsApp</span>
+                    {phone ? (
+                      <Verify size={18} color="#10B981" variant="Bold" />
+                    ) : (
+                      <CloseCircle size={18} color="#EF4444" variant="Bold" />
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-900">{phone || 'Non configuré'}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Notifications: {whatsappNotifications ? 'Activées' : 'Désactivées'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsEditingNotifications(true)}
+                className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl"
+              >
+                <Edit2 size={18} color="white" variant="Bold" />
+                <span>Modifier mes paramètres de notifications</span>
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleNotificationSettingsSave} className="space-y-6">
+              {/* Email Section */}
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Adresse Email
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="votre@email.com"
+                    className="w-full px-3 py-2.5 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  />
+                  <Sms
+                    size={20}
+                    color="#6B7280"
+                    className="absolute left-3 top-1/2 -translate-y-1/2"
+                  />
+                </div>
+
+                {/* Email Notifications Toggle */}
+                <label className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200 cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <Sms size={20} color="#3B82F6" variant="Bold" />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        Recevoir les notifications par email
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Recevez les notifications importantes par email
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={emailNotifications}
+                    onChange={(e) => setEmailNotifications(e.target.checked)}
+                    disabled={!email}
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                  />
+                </label>
+              </div>
+
+              {/* Phone Section */}
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Numéro WhatsApp
+                </label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+33 6 12 34 56 78"
+                    className="w-full px-3 py-2.5 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  />
+                  <Mobile
+                    size={20}
+                    color="#6B7280"
+                    className="absolute left-3 top-1/2 -translate-y-1/2"
+                  />
+                </div>
+
+                {/* WhatsApp Notifications Toggle */}
+                <label className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <Whatsapp size={20} color="#10B981" variant="Bold" />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        Recevoir les notifications par WhatsApp
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Recevez les notifications importantes sur WhatsApp
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={whatsappNotifications}
+                    onChange={(e) => setWhatsappNotifications(e.target.checked)}
+                    disabled={!phone}
+                    className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                  />
+                </label>
+              </div>
+
+              {/* Platform Notifications (Always enabled) */}
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-3">
+                  <Notification size={20} color="#6B7280" variant="Bold" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      Notifications sur la plateforme
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Toujours activées - Consultez le centre de notifications
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingNotifications(false);
+                    // Reset to current user values
+                    setEmail(user?.email || '');
+                    setPhone(user?.phone || '');
+                    setEmailNotifications(user?.emailNotifications || false);
+                    setWhatsappNotifications(user?.whatsappNotifications || false);
+                  }}
+                  disabled={updatingUser}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={updatingUser}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg"
+                >
+                  {updatingUser ? (
+                    <>
+                      <SpinLoader />
+                      <span>Enregistrement...</span>
+                    </>
+                  ) : (
+                    <>
+                      <TickCircle size={18} color="white" variant="Bold" />
+                      <span>Enregistrer les paramètres</span>
                     </>
                   )}
                 </button>
