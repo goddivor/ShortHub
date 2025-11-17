@@ -24,7 +24,11 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
   // Fetch notifications
-  const { data, loading, refetch } = useQuery(GET_NOTIFICATIONS_QUERY, {
+  const { data, loading, refetch } = useQuery<{
+    notifications: {
+      edges: { node: NotificationType }[]
+    }
+  }>(GET_NOTIFICATIONS_QUERY, {
     variables: {
       first: 20,
       unreadOnly: showUnreadOnly,
@@ -33,7 +37,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   });
 
   // Fetch unread count
-  const { data: countData } = useQuery(GET_UNREAD_NOTIFICATIONS_COUNT_QUERY, {
+  const { data: countData } = useQuery<{ unreadNotificationsCount: number }>(GET_UNREAD_NOTIFICATIONS_COUNT_QUERY, {
     skip: !isOpen,
     pollInterval: 30000, // Rafraîchir toutes les 30 secondes
   });

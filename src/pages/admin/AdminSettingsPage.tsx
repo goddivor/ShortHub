@@ -22,7 +22,13 @@ const AdminSettingsPage: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
 
   // Fetch notification settings
-  const { data, loading, refetch } = useQuery(GET_NOTIFICATION_SETTINGS_QUERY);
+  const { data, loading, refetch } = useQuery<{
+    notificationSettings: {
+      platformNotificationsEnabled: boolean;
+      emailNotificationsEnabled: boolean;
+      whatsappNotificationsEnabled: boolean;
+    }
+  }>(GET_NOTIFICATION_SETTINGS_QUERY);
 
   // Local state for settings
   const [platformNotificationsEnabled, setPlatformNotificationsEnabled] = useState(

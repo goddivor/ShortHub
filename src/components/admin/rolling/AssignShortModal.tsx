@@ -131,7 +131,7 @@ export default function AssignShortModal({ isOpen, onClose, short, onAssigned }:
   const channelOptions: CustomSelectOption[] = matchingChannels.map((channel) => ({
     id: channel.id,
     name: `${channel.channelName} - ${getContentTypeLabel(channel.contentType)}`,
-    imageUrl: channel.imageUrl,
+    profileImage: channel.profileImageUrl,
     type: 'channel' as const,
   }));
 

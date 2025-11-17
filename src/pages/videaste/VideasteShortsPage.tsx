@@ -41,7 +41,7 @@ const VideasteShortsPage: React.FC = () => {
   }, [user?.id, statusFilter]);
 
   // Fetch shorts
-  const { data, loading, refetch } = useQuery(GET_MY_SHORTS_QUERY, {
+  const { data, loading, refetch } = useQuery<{ shorts: Short[] }>(GET_MY_SHORTS_QUERY, {
     variables: { filter },
     skip: !user,
   });

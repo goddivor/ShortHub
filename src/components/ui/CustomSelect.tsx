@@ -7,6 +7,7 @@ export interface CustomSelectOption {
   name: string;
   profileImage?: string | null;
   imageUrl?: string | null;
+  profileImageUrl?: string | null;
   type?: 'user' | 'channel';
 }
 

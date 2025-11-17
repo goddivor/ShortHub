@@ -48,7 +48,7 @@ const AdminShortsTrackingPage: React.FC = () => {
   }, [statusFilter]);
 
   // Fetch shorts
-  const { data, loading, refetch } = useQuery(GET_SHORTS_QUERY, {
+  const { data, loading, refetch } = useQuery<{ shorts: Short[] }>(GET_SHORTS_QUERY, {
     variables: { filter },
   });
 

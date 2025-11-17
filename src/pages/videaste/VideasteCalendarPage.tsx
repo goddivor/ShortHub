@@ -43,7 +43,7 @@ const VideasteCalendarPage: React.FC = () => {
     assignedToId: user?.id,
   };
 
-  const { data, loading } = useQuery(GET_MY_SHORTS_QUERY, {
+  const { data, loading } = useQuery<{ shorts: Short[] }>(GET_MY_SHORTS_QUERY, {
     variables: { filter },
     skip: !user,
   });

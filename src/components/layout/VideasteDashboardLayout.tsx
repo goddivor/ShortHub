@@ -34,7 +34,7 @@ const VideasteDashboardLayout: React.FC = () => {
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
   const [notificationOpen, setNotificationOpen] = React.useState(false);
 
-  const { data: countData } = useQuery(GET_UNREAD_NOTIFICATIONS_COUNT_QUERY, {
+  const { data: countData } = useQuery<{ unreadNotificationsCount: number }>(GET_UNREAD_NOTIFICATIONS_COUNT_QUERY, {
     pollInterval: 30000, // Rafraîchir toutes les 30 secondes
   });
 

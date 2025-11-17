@@ -249,7 +249,7 @@ export default function AdminCalendarPage() {
                 verticalAlign="middle"
                 iconType="circle"
                 iconSize={10}
-                formatter={(value, entry: { payload: { value: number } }) => `${value} (${entry.payload.value})`}
+                formatter={(value: string, entry: any) => `${value} (${entry.payload?.value ?? 0})`}
                 wrapperStyle={{ paddingLeft: '20px' }}
               />
             </PieChart>

@@ -39,7 +39,7 @@ const AdminDashboardLayout: React.FC = () => {
   const [notificationOpen, setNotificationOpen] = React.useState(false);
 
   // Fetch unread notifications count
-  const { data: countData } = useQuery(GET_UNREAD_NOTIFICATIONS_COUNT_QUERY, {
+  const { data: countData } = useQuery<{ unreadNotificationsCount: number }>(GET_UNREAD_NOTIFICATIONS_COUNT_QUERY, {
     pollInterval: 30000, // Rafraîchir toutes les 30 secondes
   });
 
