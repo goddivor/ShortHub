@@ -2,6 +2,7 @@
 interface ChannelData {
   username: string;
   subscriber_count: number;
+  profile_image_url?: string;
 }
 
 interface YouTubeChannelResponse {
@@ -10,6 +11,11 @@ interface YouTubeChannelResponse {
     snippet: {
       title: string;
       customUrl?: string;
+      thumbnails: {
+        default: { url: string };
+        medium: { url: string };
+        high: { url: string };
+      };
     };
     statistics: {
       subscriberCount: string;
@@ -179,10 +185,12 @@ const getChannelById = async (channelId: string): Promise<ChannelData> => {
     }
 
     const subscriberCount = parseInt(channel.statistics.subscriberCount) || 0;
+    const profileImageUrl = channel.snippet.thumbnails?.high?.url || channel.snippet.thumbnails?.medium?.url || channel.snippet.thumbnails?.default?.url;
 
     return {
       username: username || channel.snippet.title,
       subscriber_count: subscriberCount,
+      profile_image_url: profileImageUrl,
     };
   } catch (error) {
     console.error("Error fetching channel details:", error);

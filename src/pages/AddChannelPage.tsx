@@ -8,23 +8,15 @@ import { CustomSelect } from '@/components/forms/custom-select';
 import SpinLoader from '@/components/SpinLoader';
 import { ChannelModal } from '@/components/modal/ChannelModal';
 import { DeleteModal } from '@/components/modal/DeleteModal';
-import { 
-  ChannelService, 
-  type Channel,
-  type TagType,
-  formatSubscriberCount,
-  getTagColor,
-  getChannelTypeColor,
-  getTagOptions,
-  getTypeOptions
-} from '@/lib/supabase';
-import { 
-  Youtube, 
-  User, 
-  TrendUp, 
-  Add, 
-  Trash, 
-  Edit, 
+import { useChannels, formatSubscriberCount, getLanguageColor } from '@/hooks/useChannels';
+import type { Channel, ChannelLanguage } from '@/types/graphql';
+import {
+  Youtube,
+  User,
+  TrendUp,
+  Add,
+  Trash,
+  Edit,
   Link as LinkIcon,
   SearchNormal1,
   Filter,
@@ -33,80 +25,74 @@ import {
   ArrowDown2
 } from 'iconsax-react';
 
-type SortField = 'username' | 'subscriber_count' | 'created_at' | 'tag' | 'type';
+type SortField = 'username' | 'subscriberCount' | 'createdAt' | 'language';
 type SortDirection = 'asc' | 'desc';
 
 interface FilterState {
-  tag: string | null;
-  type: string | null;
+  language: string | null;
   search: string;
 }
 
+// Language options for the filter
+const getLanguageOptions = () => [
+  { value: 'FR', label: 'Français' },
+  { value: 'EN', label: 'Anglais' },
+  { value: 'ES', label: 'Espagnol' },
+  { value: 'DE', label: 'Allemand' },
+  { value: 'IT', label: 'Italien' },
+  { value: 'PT', label: 'Portugais' },
+  { value: 'AR', label: 'Arabe' },
+  { value: 'OTHER', label: 'Autre' }
+];
+
 const AddChannelPage: React.FC = () => {
+  // GraphQL hooks
+  const { channels: allChannels, loading: isLoading, refetch } = useChannels();
+
   // State
-  const [channels, setChannels] = useState<Channel[]>([]);
   const [filteredChannels, setFilteredChannels] = useState<Channel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  
+
   // Modal states
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
   const [deletingChannel, setDeletingChannel] = useState<Channel | null>(null);
-  
+
   // Filter and sort states
   const [filters, setFilters] = useState<FilterState>({
-    tag: null,
-    type: null,
+    language: null,
     search: ''
   });
-  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showFilters, setShowFilters] = useState(false);
-
-  // Load channels on mount
-  useEffect(() => {
-    loadChannels();
-  }, []);
 
   // Apply filters and sorting when data or filters change
   useEffect(() => {
     applyFiltersAndSort();
-  }, [channels, filters, sortField, sortDirection]);
-
-  const loadChannels = async () => {
-    try {
-      setIsLoading(true);
-      const channelsData = await ChannelService.getChannels();
-      setChannels(channelsData);
-    } catch (err) {
-      console.error('Error loading channels:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [allChannels, filters, sortField, sortDirection]);
 
   const applyFiltersAndSort = () => {
-    let filtered = [...channels];
+    if (!allChannels) {
+      setFilteredChannels([]);
+      return;
+    }
+
+    let filtered = [...allChannels];
 
     // Apply search filter
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
-      filtered = filtered.filter(channel => 
+      filtered = filtered.filter(channel =>
         channel.username.toLowerCase().includes(searchTerm) ||
-        channel.youtube_url.toLowerCase().includes(searchTerm) ||
-        (channel.domain && channel.domain.toLowerCase().includes(searchTerm))
+        channel.youtubeUrl.toLowerCase().includes(searchTerm) ||
+        (channel.channelId && channel.channelId.toLowerCase().includes(searchTerm))
       );
     }
 
-    // Apply tag filter
-    if (filters.tag) {
-      filtered = filtered.filter(channel => channel.tag === filters.tag);
-    }
-
-    // Apply type filter
-    if (filters.type) {
-      filtered = filtered.filter(channel => channel.type === filters.type);
+    // Apply language filter
+    if (filters.language) {
+      filtered = filtered.filter(channel => channel.language === filters.language);
     }
 
     // Apply sorting
@@ -115,10 +101,10 @@ const AddChannelPage: React.FC = () => {
       let bValue: any = b[sortField];
 
       // Handle different data types
-      if (sortField === 'subscriber_count') {
+      if (sortField === 'subscriberCount') {
         aValue = Number(aValue) || 0;
         bValue = Number(bValue) || 0;
-      } else if (sortField === 'created_at') {
+      } else if (sortField === 'createdAt') {
         aValue = new Date(aValue).getTime();
         bValue = new Date(bValue).getTime();
       } else {
@@ -147,8 +133,7 @@ const AddChannelPage: React.FC = () => {
 
   const clearFilters = () => {
     setFilters({
-      tag: null,
-      type: null,
+      language: null,
       search: ''
     });
   };
@@ -169,11 +154,11 @@ const AddChannelPage: React.FC = () => {
   };
 
   const handleModalSave = () => {
-    loadChannels();
+    refetch();
   };
 
   const handleDeleteComplete = () => {
-    loadChannels();
+    refetch();
   };
 
   const renderSortIcon = (field: SortField) => {
@@ -228,49 +213,37 @@ const AddChannelPage: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      {channels.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {allChannels && allChannels.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white rounded-lg p-4 border border-gray-200">
             <div className="flex items-center gap-3">
               <Youtube color="#FF0000" size={24} className="text-red-600" />
               <div>
                 <p className="text-sm text-gray-600">Chaînes totales</p>
-                <p className="text-xl font-bold text-gray-900">{channels.length}</p>
+                <p className="text-xl font-bold text-gray-900">{allChannels.length}</p>
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white rounded-lg p-4 border border-gray-200">
             <div className="flex items-center gap-3">
               <TrendUp color="#10B981" size={24} className="text-green-600" />
               <div>
                 <p className="text-sm text-gray-600">Abonnés cumulés</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {formatSubscriberCount(channels.reduce((sum, ch) => sum + ch.subscriber_count, 0))}
+                  {formatSubscriberCount(allChannels.reduce((sum, ch) => sum + (ch.subscriberCount || 0), 0))}
                 </p>
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white rounded-lg p-4 border border-gray-200">
             <div className="flex items-center gap-3">
               <User color="#3B82F6" size={24} className="text-blue-600" />
               <div>
-                <p className="text-sm text-gray-600">Chaînes Mix</p>
+                <p className="text-sm text-gray-600">Abonnés moyens</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {channels.filter(ch => ch.type === 'Mix').length}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <div className="flex items-center gap-3">
-              <Filter color="#8B5CF6" size={24} className="text-purple-600" />
-              <div>
-                <p className="text-sm text-gray-600">Spécialisées</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {channels.filter(ch => ch.type === 'Only').length}
+                  {formatSubscriberCount(Math.round(allChannels.reduce((sum, ch) => sum + (ch.subscriberCount || 0), 0) / allChannels.length))}
                 </p>
               </div>
             </div>
@@ -305,7 +278,7 @@ const AddChannelPage: React.FC = () => {
                 Filtres
               </Button>
               
-              {(filters.tag || filters.type || filters.search) && (
+              {(filters.language || filters.search) && (
                 <Button
                   onClick={clearFilters}
                   className="px-4 py-2 text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
@@ -319,24 +292,14 @@ const AddChannelPage: React.FC = () => {
 
           {/* Filter Options */}
           {showFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-1 gap-4 pt-4 border-t border-gray-200">
               <div>
                 <CustomSelect
-                  label="Filtrer par tag"
-                  options={[{ value: '', label: 'Tous les tags' }, ...getTagOptions()]}
-                  value={filters.tag || ''}
-                  onChange={(value) => setFilters(prev => ({ ...prev, tag: value || null }))}
-                  placeholder="Sélectionner un tag"
-                />
-              </div>
-              
-              <div>
-                <CustomSelect
-                  label="Filtrer par type"
-                  options={[{ value: '', label: 'Tous les types' }, ...getTypeOptions()]}
-                  value={filters.type || ''}
-                  onChange={(value) => setFilters(prev => ({ ...prev, type: value || null }))}
-                  placeholder="Sélectionner un type"
+                  label="Filtrer par langue"
+                  options={[{ value: '', label: 'Toutes les langues' }, ...getLanguageOptions()]}
+                  value={filters.language || ''}
+                  onChange={(value) => setFilters(prev => ({ ...prev, language: value || null }))}
+                  placeholder="Sélectionner une langue"
                 />
               </div>
             </div>
@@ -345,7 +308,7 @@ const AddChannelPage: React.FC = () => {
           {/* Sort Options */}
           <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-gray-200">
             <span className="text-sm font-medium text-gray-700">Trier par:</span>
-            
+
             <Button
               onClick={() => handleSort('username')}
               className={getSortButtonClass('username')}
@@ -353,37 +316,29 @@ const AddChannelPage: React.FC = () => {
               <span>Nom</span>
               {renderSortIcon('username')}
             </Button>
-            
+
             <Button
-              onClick={() => handleSort('subscriber_count')}
-              className={getSortButtonClass('subscriber_count')}
+              onClick={() => handleSort('subscriberCount')}
+              className={getSortButtonClass('subscriberCount')}
             >
               <span>Abonnés</span>
-              {renderSortIcon('subscriber_count')}
+              {renderSortIcon('subscriberCount')}
             </Button>
-            
+
             <Button
-              onClick={() => handleSort('tag')}
-              className={getSortButtonClass('tag')}
+              onClick={() => handleSort('language')}
+              className={getSortButtonClass('language')}
             >
-              <span>Tag</span>
-              {renderSortIcon('tag')}
+              <span>Langue</span>
+              {renderSortIcon('language')}
             </Button>
-            
+
             <Button
-              onClick={() => handleSort('type')}
-              className={getSortButtonClass('type')}
-            >
-              <span>Type</span>
-              {renderSortIcon('type')}
-            </Button>
-            
-            <Button
-              onClick={() => handleSort('created_at')}
-              className={getSortButtonClass('created_at')}
+              onClick={() => handleSort('createdAt')}
+              className={getSortButtonClass('createdAt')}
             >
               <span>Date d'ajout</span>
-              {renderSortIcon('created_at')}
+              {renderSortIcon('createdAt')}
             </Button>
           </div>
         </div>
@@ -393,14 +348,14 @@ const AddChannelPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
           {filteredChannels.length} chaîne{filteredChannels.length > 1 ? 's' : ''} trouvée{filteredChannels.length > 1 ? 's' : ''}
-          {channels.length !== filteredChannels.length && ` sur ${channels.length} au total`}
+          {allChannels && allChannels.length !== filteredChannels.length && ` sur ${allChannels.length} au total`}
         </p>
       </div>
 
       {/* Channels Grid */}
       {filteredChannels.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          {channels.length === 0 ? (
+          {!allChannels || allChannels.length === 0 ? (
             // No channels at all
             <>
               <Youtube color="#9CA3AF" size={64} className="text-gray-400 mx-auto mb-4" />
@@ -457,15 +412,15 @@ const AddChannelPage: React.FC = () => {
                     </h3>
                     <div className="flex items-center gap-1 text-sm text-gray-600">
                       <TrendUp color="#6B7280" size={14} className="text-gray-500" />
-                      <span>{formatSubscriberCount(channel.subscriber_count)} abonnés</span>
+                      <span>{formatSubscriberCount(channel.subscriberCount || 0)} abonnés</span>
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Action Buttons */}
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <Button
-                    onClick={() => window.open(channel.youtube_url, '_blank')}
+                    onClick={() => window.open(channel.youtubeUrl, '_blank')}
                     className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     title="Voir la chaîne YouTube"
                   >
@@ -488,31 +443,24 @@ const AddChannelPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Tags */}
+              {/* Language Tag */}
               <div className="flex items-center gap-2 mb-4">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getTagColor(channel.tag)}`}>
-                  {channel.tag}
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getLanguageColor(channel.language)}`}>
+                  {channel.language}
                 </span>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getChannelTypeColor(channel.type)}`}>
-                  {channel.type}
-                </span>
-              </div>
-
-              {/* Domain (if Only type) */}
-              {channel.domain && (
-                <div className="mb-4">
-                  <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
-                    {channel.domain}
+                {channel.channelId && (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium font-mono">
+                    {channel.channelId.substring(0, 8)}...
                   </span>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* URL Preview */}
               <div className="bg-gray-50 rounded-lg p-3">
                 <div className="flex items-center gap-2">
                   <User color="#6B7280" size={14} className="text-gray-500 flex-shrink-0" />
                   <span className="text-xs text-gray-600 truncate font-mono">
-                    {channel.youtube_url}
+                    {channel.youtubeUrl}
                   </span>
                 </div>
               </div>
@@ -520,7 +468,7 @@ const AddChannelPage: React.FC = () => {
               {/* Footer with creation date */}
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <p className="text-xs text-gray-500">
-                  Ajoutée le {new Date(channel.created_at).toLocaleDateString('fr-FR', {
+                  Ajoutée le {new Date(channel.createdAt).toLocaleDateString('fr-FR', {
                     day: 'numeric',
                     month: 'short',
                     year: 'numeric'
@@ -532,34 +480,34 @@ const AddChannelPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tag Distribution (only show if there are channels) */}
-      {channels.length > 0 && (
+      {/* Language Distribution (only show if there are channels) */}
+      {allChannels && allChannels.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Tag</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Langue</h3>
           <div className="flex flex-wrap gap-3">
-            {getTagOptions().map(tag => {
-              const count = channels.filter(ch => ch.tag === tag.value).length;
-              const filteredCount = filteredChannels.filter(ch => ch.tag === tag.value).length;
-              
+            {getLanguageOptions().map(lang => {
+              const count = allChannels.filter(ch => ch.language === lang.value).length;
+              const filteredCount = filteredChannels.filter(ch => ch.language === lang.value).length;
+
               if (count === 0) return null;
-              
+
               return (
-                <div key={tag.value} className="flex items-center gap-2">
+                <div key={lang.value} className="flex items-center gap-2">
                   <button
-                    onClick={() => setFilters(prev => ({ 
-                      ...prev, 
-                      tag: prev.tag === tag.value ? null : tag.value 
+                    onClick={() => setFilters(prev => ({
+                      ...prev,
+                      language: prev.language === lang.value ? null : lang.value
                     }))}
                     className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                      filters.tag === tag.value
-                        ? getTagColor(tag.value as TagType)
-                        : `${getTagColor(tag.value as TagType)} opacity-60 hover:opacity-100`
+                      filters.language === lang.value
+                        ? getLanguageColor(lang.value as ChannelLanguage)
+                        : `${getLanguageColor(lang.value as ChannelLanguage)} opacity-60 hover:opacity-100`
                     }`}
                   >
-                    {tag.value}
+                    {lang.label}
                   </button>
                   <span className="text-sm text-gray-600">
-                    ({filters.tag ? filteredCount : count})
+                    ({filters.language ? filteredCount : count})
                   </span>
                 </div>
               );
@@ -573,14 +521,14 @@ const AddChannelPage: React.FC = () => {
         isOpen={isChannelModalOpen}
         onClose={() => setIsChannelModalOpen(false)}
         onSave={handleModalSave}
-        editingChannel={editingChannel}
+        editingChannel={editingChannel as any}
       />
 
       <DeleteModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onDelete={handleDeleteComplete}
-        channel={deletingChannel}
+        channel={deletingChannel as any}
       />
     </div>
   );

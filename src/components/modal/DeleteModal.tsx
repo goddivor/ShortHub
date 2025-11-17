@@ -1,11 +1,12 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 // src/components/modal/DeleteModal.tsx
 import React, { useState } from 'react';
+import { useMutation } from '@apollo/client/react';
 import { BaseModal } from './BaseModal';
 import Button from '@/components/Button';
 import SpinLoader from '@/components/SpinLoader';
 import { useToast } from '@/context/toast-context';
-import { ChannelService, type Channel } from '@/lib/supabase';
+import { DELETE_CHANNEL_MUTATION, GET_CHANNELS_QUERY } from '@/lib/graphql';
+import type { Channel } from '@/types/graphql';
 import { Trash, Warning2, Youtube } from 'iconsax-react';
 
 interface DeleteModalProps {
@@ -24,18 +25,26 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
   const { success, error } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [deleteChannelMutation] = useMutation(DELETE_CHANNEL_MUTATION, {
+    refetchQueries: [{ query: GET_CHANNELS_QUERY }],
+    awaitRefetchQueries: true,
+  });
+
   const handleDelete = async () => {
     if (!channel) return;
 
     setIsDeleting(true);
 
     try {
-      await ChannelService.deleteChannel(channel.id);
+      await deleteChannelMutation({
+        variables: { id: channel.id },
+      });
       success('Chaîne supprimée', 'La chaîne a été supprimée avec succès');
       onDelete();
       onClose();
     } catch (err) {
       error('Erreur de suppression', 'Impossible de supprimer la chaîne');
+      console.error('Delete error:', err);
     } finally {
       setIsDeleting(false);
     }
@@ -72,7 +81,7 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
             Êtes-vous absolument sûr ?
           </h4>
           <p className="text-sm text-red-700 mb-3">
-            Cette action supprimera définitivement la chaîne <strong>"{channel.username}"</strong> 
+            Cette action supprimera définitivement la chaîne <strong>"{channel.username}"</strong>
             et toutes ses données associées, y compris :
           </p>
           <ul className="text-sm text-red-700 space-y-1 ml-4">
@@ -90,10 +99,10 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
             </div>
             <div className="min-w-0 flex-1">
               <h4 className="font-medium text-gray-900 truncate">{channel.username}</h4>
-              <p className="text-sm text-gray-600 truncate">{channel.youtube_url}</p>
+              <p className="text-sm text-gray-600 truncate">{channel.youtubeUrl}</p>
               <div className="flex items-center gap-2 mt-1">
                 <span className={`px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800`}>
-                  {channel.tag}
+                  {channel.language}
                 </span>
                 <span className={`px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800`}>
                   {channel.type}
@@ -121,7 +130,7 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
         >
           Annuler
         </Button>
-        
+
         <Button
           onClick={handleDelete}
           disabled={isDeleting}

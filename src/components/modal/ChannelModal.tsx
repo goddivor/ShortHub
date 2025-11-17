@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from "react";
+import { useMutation } from "@apollo/client/react";
 import { BaseModal } from "./BaseModal";
 import { Input } from "@/components/forms/Input";
 import { CustomSelect } from "@/components/forms/custom-select";
@@ -8,23 +8,60 @@ import Button from "@/components/Button";
 import SpinLoader from "@/components/SpinLoader";
 import { useToast } from "@/context/toast-context";
 import {
-  ChannelService,
-  type CreateChannelInput,
-  type TagType,
-  type ChannelType,
-  type Channel,
-  getTagOptions,
-  getTypeOptions,
-  formatSubscriberCount,
-} from "@/lib/supabase";
+  CREATE_CHANNEL_MUTATION,
+  UPDATE_CHANNEL_MUTATION,
+  GET_CHANNELS_QUERY,
+} from "@/lib/graphql";
+import type {
+  Channel,
+  ChannelLanguage,
+  ChannelType,
+  CreateChannelInput,
+  UpdateChannelInput,
+} from "@/types/graphql";
+import { ChannelPurpose } from "@/types/graphql";
 import { extractChannelData } from "@/lib/youtube-api";
 import { Youtube, TrendUp, Save2, Add, Edit } from "iconsax-react";
+
+// Language options mapping
+const LANGUAGE_OPTIONS = [
+  { label: "VF", value: "VF" },
+  { label: "VA", value: "VA" },
+  { label: "VOSTFR", value: "VOSTFR" },
+  { label: "VOSTA", value: "VOSTA" },
+  { label: "VO", value: "VO" },
+];
+
+// Channel Type options
+const TYPE_OPTIONS = [
+  { label: "Mix (Contenu varié)", value: "MIX" },
+  { label: "Only (Spécialisé)", value: "ONLY" },
+];
+
+// Channel Purpose - default to PUBLICATION
+const DEFAULT_PURPOSE = ChannelPurpose.PUBLICATION;
+
+// Utility function to format subscriber count
+const formatSubscriberCount = (count: number): string => {
+  if (count >= 1000000) return (count / 1000000).toFixed(1) + "M";
+  if (count >= 1000) return (count / 1000).toFixed(1) + "K";
+  return count.toString();
+};
 
 interface ChannelModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: () => void;
   editingChannel?: Channel | null;
+}
+
+interface FormData {
+  youtubeUrl: string;
+  username: string;
+  subscriberCount: number;
+  language?: ChannelLanguage;
+  type?: ChannelType;
+  domain?: string;
 }
 
 export const ChannelModal: React.FC<ChannelModalProps> = ({
@@ -35,12 +72,23 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
 }) => {
   const { success, error, info } = useToast();
 
+  // Mutations
+  const [createChannelMutation] = useMutation(CREATE_CHANNEL_MUTATION, {
+    refetchQueries: [{ query: GET_CHANNELS_QUERY }],
+    awaitRefetchQueries: true,
+  });
+
+  const [updateChannelMutation] = useMutation(UPDATE_CHANNEL_MUTATION, {
+    refetchQueries: [{ query: GET_CHANNELS_QUERY }],
+    awaitRefetchQueries: true,
+  });
+
   // Form state
-  const [formData, setFormData] = useState<Partial<CreateChannelInput>>({
-    youtube_url: "",
+  const [formData, setFormData] = useState<FormData>({
+    youtubeUrl: "",
     username: "",
-    subscriber_count: 0,
-    tag: undefined,
+    subscriberCount: 0,
+    language: undefined,
     type: undefined,
     domain: "",
   });
@@ -55,22 +103,22 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (editingChannel) {
-        const initialData = {
-          youtube_url: editingChannel.youtube_url,
+        const initialData: FormData = {
+          youtubeUrl: editingChannel.youtubeUrl,
           username: editingChannel.username,
-          subscriber_count: editingChannel.subscriber_count,
-          tag: editingChannel.tag,
+          subscriberCount: editingChannel.subscriberCount,
+          language: editingChannel.language,
           type: editingChannel.type,
           domain: editingChannel.domain || "",
         };
         setFormData(initialData);
-        setInitialUrl(editingChannel.youtube_url); // Store initial URL to prevent auto-extraction
+        setInitialUrl(editingChannel.youtubeUrl); // Store initial URL to prevent auto-extraction
       } else {
         setFormData({
-          youtube_url: "",
+          youtubeUrl: "",
           username: "",
-          subscriber_count: 0,
-          tag: undefined,
+          subscriberCount: 0,
+          language: undefined,
           type: undefined,
           domain: "",
         });
@@ -96,7 +144,7 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
       setFormData((prev) => ({
         ...prev,
         username: data.username,
-        subscriber_count: data.subscriber_count,
+        subscriberCount: data.subscriber_count,
       }));
 
       success(
@@ -119,25 +167,25 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
 
   // Handle URL change with debounce (only extract if URL actually changed from initial)
   useEffect(() => {
-    if (!formData.youtube_url || formData.youtube_url.length < 10) return;
+    if (!formData.youtubeUrl || formData.youtubeUrl.length < 10) return;
 
     // Don't auto-extract if this is the initial URL from editing mode
-    if (isEditMode && formData.youtube_url === initialUrl) return;
+    if (isEditMode && formData.youtubeUrl === initialUrl) return;
 
     const timer = setTimeout(() => {
-      handleUrlExtraction(formData.youtube_url!);
+      handleUrlExtraction(formData.youtubeUrl);
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [formData.youtube_url, initialUrl, isEditMode]);
+  }, [formData.youtubeUrl, initialUrl, isEditMode]);
 
   // Save channel
   const handleSave = async () => {
     // Validation
     if (
-      !formData.youtube_url ||
+      !formData.youtubeUrl ||
       !formData.username ||
-      !formData.tag ||
+      !formData.language ||
       !formData.type
     ) {
       error(
@@ -147,7 +195,7 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
       return;
     }
 
-    if (formData.type === "Only" && !formData.domain) {
+    if (formData.type === "ONLY" && !formData.domain) {
       error(
         "Domaine requis",
         'Veuillez spécifier un domaine pour le type "Only"'
@@ -158,23 +206,43 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
     setIsSaving(true);
 
     try {
-      const channelData: CreateChannelInput = {
-        youtube_url: formData.youtube_url!,
-        username: formData.username!,
-        subscriber_count: formData.subscriber_count || 0,
-        tag: formData.tag!,
-        type: formData.type!,
-        domain: formData.domain || undefined,
-      };
-
       if (editingChannel) {
-        await ChannelService.updateChannel(editingChannel.id, channelData);
+        // Update existing channel
+        const updateInput: UpdateChannelInput = {
+          username: formData.username,
+          subscriberCount: formData.subscriberCount,
+          language: formData.language,
+          type: formData.type,
+          domain: formData.domain || undefined,
+        };
+
+        await updateChannelMutation({
+          variables: {
+            id: editingChannel.id,
+            input: updateInput,
+          },
+        });
+
         success(
           "Chaîne mise à jour !",
           "Les modifications ont été sauvegardées"
         );
       } else {
-        await ChannelService.createChannel(channelData);
+        // Create new channel
+        const createInput: CreateChannelInput = {
+          youtubeUrl: formData.youtubeUrl,
+          username: formData.username,
+          subscriberCount: formData.subscriberCount,
+          language: formData.language,
+          channelPurpose: DEFAULT_PURPOSE,
+          type: formData.type,
+          domain: formData.domain || undefined,
+        };
+
+        await createChannelMutation({
+          variables: { input: createInput },
+        });
+
         success("Chaîne ajoutée !", "La nouvelle chaîne a été enregistrée");
       }
 
@@ -182,6 +250,7 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
       onClose();
     } catch (err) {
       error("Erreur de sauvegarde", "Impossible d'enregistrer la chaîne");
+      console.error("Save error:", err);
     } finally {
       setIsSaving(false);
     }
@@ -223,9 +292,9 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
           <Input
             label="URL YouTube *"
             placeholder="https://youtube.com/@channel"
-            value={formData.youtube_url || ""}
+            value={formData.youtubeUrl || ""}
             onChange={(e) =>
-              setFormData((prev) => ({ ...prev, youtube_url: e.target.value }))
+              setFormData((prev) => ({ ...prev, youtubeUrl: e.target.value }))
             }
           />
           <p className="text-xs text-gray-500 mt-1">
@@ -257,7 +326,7 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
         </div>
 
         {/* Subscriber Count Display */}
-        {(formData.subscriber_count ?? 0) > 0 && (
+        {(formData.subscriberCount ?? 0) > 0 && (
           <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-lg p-4">
             <div className="flex items-center gap-3">
               <div className="bg-red-100 rounded-full p-2">
@@ -269,7 +338,7 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
                 </h4>
                 <p className="text-sm text-red-700">
                   <strong>
-                    {formatSubscriberCount(formData.subscriber_count ?? 0)}
+                    {formatSubscriberCount(formData.subscriberCount ?? 0)}
                   </strong>{" "}
                   abonnés
                 </p>
@@ -282,13 +351,13 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <CustomSelect
-              label="Tag de langue *"
-              options={getTagOptions()}
-              value={formData.tag || null}
+              label="Langue *"
+              options={LANGUAGE_OPTIONS}
+              value={formData.language || null}
               onChange={(value) =>
-                setFormData((prev) => ({ ...prev, tag: value as TagType }))
+                setFormData((prev) => ({ ...prev, language: value as ChannelLanguage }))
               }
-              placeholder="Sélectionner un tag"
+              placeholder="Sélectionner une langue"
             />
             <p className="text-xs text-gray-500 mt-1">
               VF, VOSTFR, VA, VOSTA, VO
@@ -298,7 +367,7 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
           <div>
             <CustomSelect
               label="Type de contenu *"
-              options={getTypeOptions()}
+              options={TYPE_OPTIONS}
               value={formData.type || null}
               onChange={(value) =>
                 setFormData((prev) => ({ ...prev, type: value as ChannelType }))
@@ -312,7 +381,7 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
         </div>
 
         {/* Domain Field (if Only type) */}
-        {formData.type === "Only" && (
+        {formData.type === "ONLY" && (
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
             <Input
               label="Domaine spécialisé *"
@@ -339,15 +408,15 @@ export const ChannelModal: React.FC<ChannelModalProps> = ({
               <p>
                 <strong>Nom:</strong> {formData.username}
               </p>
-              {(formData.subscriber_count ?? 0) > 0 && (
+              {(formData.subscriberCount ?? 0) > 0 && (
                 <p>
                   <strong>Abonnés:</strong>{" "}
-                  {formatSubscriberCount(formData.subscriber_count ?? 0)}
+                  {formatSubscriberCount(formData.subscriberCount ?? 0)}
                 </p>
               )}
-              {formData.tag && (
+              {formData.language && (
                 <p>
-                  <strong>Tag:</strong> {formData.tag}
+                  <strong>Langue:</strong> {formData.language}
                 </p>
               )}
               {formData.type && (

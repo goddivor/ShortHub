@@ -3,16 +3,17 @@ import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router';
 import Logo from '@/components/ui/logo';
 import Button from '@/components/Button';
-import { 
-  Home, 
-  User, 
-  VideoPlay, 
-  Setting2, 
+import { useAuth } from '@/hooks/useAuth';
+import {
+  Home,
+  User,
+  VideoPlay,
   HambergerMenu,
   CloseSquare,
-  Youtube,
+
   Chart,
-  TrendUp
+  TrendUp,
+  Logout
 } from 'iconsax-react';
 
 interface SidebarItem {
@@ -25,7 +26,9 @@ interface SidebarItem {
 const DashboardLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
 
   const sidebarItems: SidebarItem[] = [
     {
@@ -45,12 +48,6 @@ const DashboardLayout: React.FC = () => {
       label: 'Générer Shorts',
       icon: <VideoPlay color="#FF0000" size={20} className="text-red-600" />,
       description: 'Rolling & validation'
-    },
-    {
-      path: '/dashboard/debug',
-      label: 'Debug',
-      icon: <Setting2 color="#6B7280" size={20} className="text-gray-500" />,
-      description: 'Tests & configuration'
     }
   ];
 
@@ -65,6 +62,19 @@ const DashboardLayout: React.FC = () => {
     navigate(path);
     setSidebarOpen(false); // Close mobile sidebar
   };
+
+  // Close user menu when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (userMenuOpen && !target.closest('.relative')) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [userMenuOpen]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -111,21 +121,6 @@ const DashboardLayout: React.FC = () => {
             ))}
           </nav>
 
-          {/* Sidebar Footer */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Youtube color="#FF0000" size={16} className="text-red-600" />
-                <span className="text-sm font-medium text-red-900">ShortHub Pro</span>
-              </div>
-              <p className="text-xs text-red-700 mb-3">
-                Optimisez votre workflow YouTube Shorts
-              </p>
-              <button className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-medium py-2 px-3 rounded-md transition-colors">
-                Upgrade
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -221,12 +216,40 @@ const DashboardLayout: React.FC = () => {
                   </div>
                 </div>
 
-                {/* User Menu Placeholder */}
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                    <User color="#FF0000" size={16} className="text-red-600" />
-                  </div>
-                  <span className="hidden sm:block text-sm font-medium text-gray-700">Admin</span>
+                {/* User Menu */}
+                <div className="relative">
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center gap-2 hover:bg-gray-50 rounded-lg p-2 transition-colors"
+                  >
+                    <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                      <User color="#FF0000" size={16} className="text-red-600" />
+                    </div>
+                    <div className="hidden sm:block text-left">
+                      <p className="text-sm font-medium text-gray-700">{user?.username}</p>
+                      <p className="text-xs text-gray-500">{user?.role}</p>
+                    </div>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {userMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                      <div className="px-4 py-2 border-b border-gray-200">
+                        <p className="text-sm font-medium text-gray-900">{user?.username}</p>
+                        <p className="text-xs text-gray-500">{user?.email}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          logout();
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <Logout size={16} />
+                        <span>Déconnexion</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

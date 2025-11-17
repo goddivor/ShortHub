@@ -13,25 +13,25 @@ export default function Logo() {
           r="30"
           fill="#FF0000"
           stroke="#CC0000"
-          stroke-width="2"
+          strokeWidth="2"
         />
 
         <g transform="translate(32,32)">
           <path
             d="M 0,-20 A 20,20 0 0,1 14.14,-14.14"
             stroke="white"
-            stroke-width="2.5"
+            strokeWidth="2.5"
             fill="none"
-            stroke-linecap="round"
+            strokeLinecap="round"
           />
           <polygon points="14.14,-14.14 18,-18 18,-10 10,-10" fill="white" />
 
           <path
             d="M 0,20 A 20,20 0 0,1 -14.14,14.14"
             stroke="white"
-            stroke-width="2.5"
+            strokeWidth="2.5"
             fill="none"
-            stroke-linecap="round"
+            strokeLinecap="round"
           />
           <polygon points="-14.14,14.14 -18,18 -18,10 -10,10" fill="white" />
         </g>
