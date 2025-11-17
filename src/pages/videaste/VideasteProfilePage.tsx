@@ -127,12 +127,18 @@ const VideasteProfilePage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await changePassword({
+      const result = await changePassword({
         variables: {
           oldPassword,
           newPassword
         }
       });
+
+      // Vérifier s'il y a des erreurs GraphQL
+      if (result.errors && result.errors.length > 0) {
+        error('Erreur', result.errors[0].message || 'Erreur lors de la modification du mot de passe');
+        return;
+      }
 
       setOldPassword('');
       setNewPassword('');
