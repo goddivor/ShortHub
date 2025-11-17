@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useMutation } from '@apollo/client/react';
-import { UPLOAD_PROFILE_IMAGE_MUTATION, REMOVE_PROFILE_IMAGE_MUTATION, UPDATE_USER_MUTATION } from '@/lib/graphql';
+import { UPLOAD_PROFILE_IMAGE_MUTATION, REMOVE_PROFILE_IMAGE_MUTATION, UPDATE_USER_MUTATION, CHANGE_PASSWORD_MUTATION } from '@/lib/graphql';
 import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
 import {
@@ -65,6 +65,8 @@ const VideasteProfilePage: React.FC = () => {
     }
   });
 
+  const [changePassword] = useMutation(CHANGE_PASSWORD_MUTATION);
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -125,16 +127,20 @@ const VideasteProfilePage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // TODO: Implement password change logic
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await changePassword({
+        variables: {
+          oldPassword,
+          newPassword
+        }
+      });
 
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setIsEditingPassword(false);
       success('Mot de passe modifié', 'Votre mot de passe a été modifié avec succès');
-    } catch {
-      error('Erreur', 'Erreur lors de la modification du mot de passe');
+    } catch (err: any) {
+      error('Erreur', err.message || 'Erreur lors de la modification du mot de passe');
     } finally {
       setIsSubmitting(false);
     }
