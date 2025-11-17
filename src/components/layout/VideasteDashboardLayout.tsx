@@ -92,7 +92,9 @@ const VideasteDashboardLayout: React.FC = () => {
         <div className="flex flex-col flex-grow bg-white border-r border-gray-200 shadow-sm">
           {/* Sidebar Header */}
           <div className="flex items-center gap-3 p-6 border-b border-gray-200">
-            <Logo />
+            <div className="scale-75">
+              <Logo />
+            </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900">ShortHub</h1>
               <p className="text-xs text-gray-500">Vidéaste Panel</p>

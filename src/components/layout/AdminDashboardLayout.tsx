@@ -127,7 +127,9 @@ const AdminDashboardLayout: React.FC = () => {
         <div className="flex flex-col flex-grow bg-white border-r border-gray-200 shadow-sm">
           {/* Sidebar Header */}
           <div className="flex items-center gap-3 p-6 border-b border-gray-200">
-            <Logo />
+            <div className="scale-75">
+              <Logo />
+            </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900">ShortHub</h1>
               <p className="text-xs text-gray-500">Admin Panel</p>
@@ -150,8 +152,8 @@ const AdminDashboardLayout: React.FC = () => {
               >
                 <div className={`
                   p-2 rounded-lg transition-all duration-200
-                  ${isActivePath(item.path) 
-                    ? 'bg-red-100' 
+                  ${isActivePath(item.path)
+                    ? 'bg-red-100'
                     : 'bg-gray-100'
                   }
                 `}>
@@ -171,7 +173,7 @@ const AdminDashboardLayout: React.FC = () => {
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black/20 bg-opacity-50" onClick={() => setSidebarOpen(false)} />
-          
+
           <div className="relative flex flex-col w-64 bg-white shadow-xl">
             {/* Mobile Sidebar Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
@@ -203,8 +205,8 @@ const AdminDashboardLayout: React.FC = () => {
                 >
                   <div className={`
                     p-2 rounded-lg transition-all duration-200
-                    ${isActivePath(item.path) 
-                      ? 'bg-red-100' 
+                    ${isActivePath(item.path)
+                      ? 'bg-red-100'
                       : 'bg-gray-100'
                     }
                   `}>
