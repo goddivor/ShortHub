@@ -10,6 +10,7 @@ import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
 import CustomSelect, { CustomSelectOption } from '@/components/ui/CustomSelect';
 import { CloseCircle, User, Youtube, Calendar, DocumentText, Send2 } from 'iconsax-react';
+import { getCompatiblePublicationTypes } from '@/utils/contentTypeCompatibility';
 
 interface AssignShortModalProps {
   isOpen: boolean;
@@ -35,12 +36,14 @@ export default function AssignShortModal({ isOpen, onClose, short, onAssigned }:
     GET_ADMIN_CHANNELS_QUERY
   );
 
-  // Filtrer les chaînes par type de contenu correspondant
+  // Filtrer les chaînes par type de contenu correspondant (avec logique de compatibilité)
   const matchingChannels = useMemo(() => {
     if (!channelsData?.adminChannels || !short) return [];
     const sourceContentType = short.sourceChannel.contentType;
+    const compatibleTypes = getCompatiblePublicationTypes(sourceContentType);
+
     return channelsData.adminChannels.filter(
-      (channel) => channel.contentType === sourceContentType
+      (channel) => compatibleTypes.includes(channel.contentType)
     );
   }, [channelsData, short]);
 
@@ -107,6 +110,8 @@ export default function AssignShortModal({ isOpen, onClose, short, onAssigned }:
       [ContentType.VA_AVEC_EDIT]: 'VA Avec Édition',
       [ContentType.VF_SANS_EDIT]: 'VF Sans Édition',
       [ContentType.VF_AVEC_EDIT]: 'VF Avec Édition',
+      [ContentType.VO_SANS_EDIT]: 'VO Sans Édition',
+      [ContentType.VO_AVEC_EDIT]: 'VO Avec Édition',
     };
     return labels[contentType] || contentType;
   };
@@ -245,11 +250,11 @@ export default function AssignShortModal({ isOpen, onClose, short, onAssigned }:
                 />
                 {matchingChannels.length === 0 && (
                   <p className="text-xs text-orange-600 mt-1">
-                    Aucune chaîne de publication de type "{getContentTypeLabel(short.sourceChannel.contentType)}" disponible.
+                    Aucune chaîne de publication compatible avec "{getContentTypeLabel(short.sourceChannel.contentType)}" disponible.
                   </p>
                 )}
                 <p className="text-xs text-gray-500 mt-1">
-                  Seules les chaînes de type "{getContentTypeLabel(short.sourceChannel.contentType)}" sont affichées
+                  Seules les chaînes compatibles avec le type source "{getContentTypeLabel(short.sourceChannel.contentType)}" sont affichées
                 </p>
               </div>
 
