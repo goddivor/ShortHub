@@ -122,6 +122,8 @@ export const getContentTypeLabel = (contentType: ContentType): string => {
     VA_AVEC_EDIT: 'VA Avec Edit',
     VF_SANS_EDIT: 'VF Sans Edit',
     VF_AVEC_EDIT: 'VF Avec Edit',
+    VO_SANS_EDIT: 'VO Sans Edit',
+    VO_AVEC_EDIT: 'VO Avec Edit',
   };
   return labels[contentType];
 };
@@ -132,6 +134,8 @@ export const getContentTypeColor = (contentType: ContentType): string => {
     VA_AVEC_EDIT: 'bg-orange-100 text-orange-800',
     VF_SANS_EDIT: 'bg-blue-100 text-blue-800',
     VF_AVEC_EDIT: 'bg-purple-100 text-purple-800',
+    VO_SANS_EDIT: 'bg-green-100 text-green-800',
+    VO_AVEC_EDIT: 'bg-emerald-100 text-emerald-800',
   };
   return colors[contentType];
 };
@@ -141,4 +145,6 @@ export const getContentTypeOptions = () => [
   { value: 'VA_AVEC_EDIT', label: 'VA Avec Edit' },
   { value: 'VF_SANS_EDIT', label: 'VF Sans Edit' },
   { value: 'VF_AVEC_EDIT', label: 'VF Avec Edit' },
+  { value: 'VO_SANS_EDIT', label: 'VO Sans Edit' },
+  { value: 'VO_AVEC_EDIT', label: 'VO Avec Edit' },
 ];

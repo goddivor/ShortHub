@@ -11,9 +11,11 @@ import AssignShortModal from '@/components/admin/rolling/AssignShortModal';
 const getContentTypeShort = (contentType: ContentType): string => {
   const shorts = {
     [ContentType.VA_SANS_EDIT]: 'VA',
-    [ContentType.VA_AVEC_EDIT]: 'VA-E',
+    [ContentType.VA_AVEC_EDIT]: 'VAE',
     [ContentType.VF_SANS_EDIT]: 'VF',
-    [ContentType.VF_AVEC_EDIT]: 'VF-E',
+    [ContentType.VF_AVEC_EDIT]: 'VFE',
+    [ContentType.VO_SANS_EDIT]: 'VO',
+    [ContentType.VO_AVEC_EDIT]: 'VOE',
   };
   return shorts[contentType] || contentType;
 };
@@ -25,6 +27,8 @@ const getContentTypeColor = (contentType: ContentType): string => {
     [ContentType.VA_AVEC_EDIT]: 'bg-blue-700 text-white',
     [ContentType.VF_SANS_EDIT]: 'bg-purple-500 text-white',
     [ContentType.VF_AVEC_EDIT]: 'bg-purple-700 text-white',
+    [ContentType.VO_SANS_EDIT]: 'bg-green-500 text-white',
+    [ContentType.VO_AVEC_EDIT]: 'bg-emerald-700 text-white',
   };
   return colors[contentType] || 'bg-gray-500 text-white';
 };

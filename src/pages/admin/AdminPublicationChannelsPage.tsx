@@ -19,6 +19,8 @@ const getContentTypeLabel = (contentType: ContentType): string => {
     [ContentType.VA_AVEC_EDIT]: 'VA Avec Édition',
     [ContentType.VF_SANS_EDIT]: 'VF Sans Édition',
     [ContentType.VF_AVEC_EDIT]: 'VF Avec Édition',
+    [ContentType.VO_SANS_EDIT]: 'VO Sans Édition',
+    [ContentType.VO_AVEC_EDIT]: 'VO Avec Édition',
   };
   return labels[contentType] || contentType;
 };
@@ -30,6 +32,8 @@ const getContentTypeColor = (contentType: ContentType): string => {
     [ContentType.VA_AVEC_EDIT]: 'bg-blue-100 text-blue-800',
     [ContentType.VF_SANS_EDIT]: 'bg-purple-100 text-purple-800',
     [ContentType.VF_AVEC_EDIT]: 'bg-purple-100 text-purple-800',
+    [ContentType.VO_SANS_EDIT]: 'bg-green-100 text-green-800',
+    [ContentType.VO_AVEC_EDIT]: 'bg-emerald-100 text-emerald-800',
   };
   return colors[contentType] || 'bg-gray-100 text-gray-800';
 };
