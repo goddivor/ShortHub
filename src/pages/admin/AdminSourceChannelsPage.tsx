@@ -17,6 +17,8 @@ const contentTypeLabels: Record<ContentType, string> = {
   [ContentType.VA_AVEC_EDIT]: 'VA Avec Édition',
   [ContentType.VF_SANS_EDIT]: 'VF Sans Édition',
   [ContentType.VF_AVEC_EDIT]: 'VF Avec Édition',
+  [ContentType.VO_SANS_EDIT]: 'VO Sans Édition',
+  [ContentType.VO_AVEC_EDIT]: 'VO Avec Édition',
 };
 
 const contentTypeColors: Record<ContentType, string> = {
@@ -24,6 +26,8 @@ const contentTypeColors: Record<ContentType, string> = {
   [ContentType.VA_AVEC_EDIT]: 'bg-purple-100 text-purple-700',
   [ContentType.VF_SANS_EDIT]: 'bg-green-100 text-green-700',
   [ContentType.VF_AVEC_EDIT]: 'bg-orange-100 text-orange-700',
+  [ContentType.VO_SANS_EDIT]: 'bg-emerald-100 text-emerald-700',
+  [ContentType.VO_AVEC_EDIT]: 'bg-teal-100 text-teal-700',
 };
 
 export default function AdminSourceChannelsPage() {
@@ -133,7 +137,7 @@ export default function AdminSourceChannelsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
             <p className="text-blue-100 text-sm font-medium">Total</p>
             <p className="text-3xl font-bold mt-1">{data?.sourceChannels?.length || 0}</p>
@@ -151,9 +155,21 @@ export default function AdminSourceChannelsPage() {
             </p>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+            <p className="text-blue-100 text-sm font-medium">VO Sans Édition</p>
+            <p className="text-3xl font-bold mt-1">
+              {data?.sourceChannels?.filter((c) => c.contentType === ContentType.VO_SANS_EDIT).length || 0}
+            </p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
             <p className="text-blue-100 text-sm font-medium">Avec Édition</p>
             <p className="text-3xl font-bold mt-1">
-              {data?.sourceChannels?.filter((c) => c.contentType === ContentType.VA_AVEC_EDIT || c.contentType === ContentType.VF_AVEC_EDIT).length || 0}
+              {data?.sourceChannels?.filter((c) => c.contentType === ContentType.VA_AVEC_EDIT || c.contentType === ContentType.VF_AVEC_EDIT || c.contentType === ContentType.VO_AVEC_EDIT).length || 0}
+            </p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+            <p className="text-blue-100 text-sm font-medium">Total VO</p>
+            <p className="text-3xl font-bold mt-1">
+              {data?.sourceChannels?.filter((c) => c.contentType === ContentType.VO_SANS_EDIT || c.contentType === ContentType.VO_AVEC_EDIT).length || 0}
             </p>
           </div>
         </div>
@@ -182,6 +198,8 @@ export default function AdminSourceChannelsPage() {
               <option value={ContentType.VA_AVEC_EDIT}>VA Avec Édition</option>
               <option value={ContentType.VF_SANS_EDIT}>VF Sans Édition</option>
               <option value={ContentType.VF_AVEC_EDIT}>VF Avec Édition</option>
+              <option value={ContentType.VO_SANS_EDIT}>VO Sans Édition</option>
+              <option value={ContentType.VO_AVEC_EDIT}>VO Avec Édition</option>
             </select>
           </div>
         </div>
