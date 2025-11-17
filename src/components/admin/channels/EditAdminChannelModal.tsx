@@ -5,6 +5,7 @@ import { AdminChannel, ContentType } from '@/types/graphql';
 import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
 import { CloseCircle, Edit, VideoPlay } from 'iconsax-react';
+import { getPublicationContentTypes } from '@/utils/contentTypeCompatibility';
 
 interface EditAdminChannelModalProps {
   isOpen: boolean;
@@ -50,6 +51,18 @@ export default function EditAdminChannelModal({ isOpen, onClose, channel }: Edit
     } catch {
       // Error handled by onError
     }
+  };
+
+  const getContentTypeLabel = (type: ContentType): string => {
+    const labels: Record<ContentType, string> = {
+      [ContentType.VA_SANS_EDIT]: 'VA Sans Édition',
+      [ContentType.VA_AVEC_EDIT]: 'VA Avec Édition',
+      [ContentType.VF_SANS_EDIT]: 'VF Sans Édition',
+      [ContentType.VF_AVEC_EDIT]: 'VF Avec Édition',
+      [ContentType.VO_SANS_EDIT]: 'VO Sans Édition',
+      [ContentType.VO_AVEC_EDIT]: 'VO Avec Édition',
+    };
+    return labels[type] || type;
   };
 
   if (!isOpen || !channel) return null;
@@ -113,10 +126,11 @@ export default function EditAdminChannelModal({ isOpen, onClose, channel }: Edit
                 className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all appearance-none bg-white"
                 disabled={loading}
               >
-                <option value={ContentType.VA_SANS_EDIT}>VA Sans Édition</option>
-                <option value={ContentType.VA_AVEC_EDIT}>VA Avec Édition</option>
-                <option value={ContentType.VF_SANS_EDIT}>VF Sans Édition</option>
-                <option value={ContentType.VF_AVEC_EDIT}>VF Avec Édition</option>
+                {getPublicationContentTypes().map((type) => (
+                  <option key={type} value={type}>
+                    {getContentTypeLabel(type)}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

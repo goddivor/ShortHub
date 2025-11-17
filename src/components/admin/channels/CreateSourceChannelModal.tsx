@@ -6,6 +6,7 @@ import { useToast } from '@/context/toast-context';
 import { extractChannelData } from '@/lib/youtube-api';
 import SpinLoader from '@/components/SpinLoader';
 import { CloseCircle, Youtube, VideoPlay, TickCircle, Warning2 } from 'iconsax-react';
+import { getSourceContentTypes } from '@/utils/contentTypeCompatibility';
 
 interface CreateSourceChannelModalProps {
   isOpen: boolean;
@@ -117,6 +118,18 @@ export default function CreateSourceChannelModal({ isOpen, onClose }: CreateSour
       return `${(count / 1000).toFixed(1)}K`;
     }
     return count.toString();
+  };
+
+  const getContentTypeLabel = (type: ContentType): string => {
+    const labels: Record<ContentType, string> = {
+      [ContentType.VA_SANS_EDIT]: 'VA Sans Édition',
+      [ContentType.VA_AVEC_EDIT]: 'VA Avec Édition',
+      [ContentType.VF_SANS_EDIT]: 'VF Sans Édition',
+      [ContentType.VF_AVEC_EDIT]: 'VF Avec Édition',
+      [ContentType.VO_SANS_EDIT]: 'VO Sans Édition',
+      [ContentType.VO_AVEC_EDIT]: 'VO Avec Édition',
+    };
+    return labels[type] || type;
   };
 
   if (!isOpen) return null;
@@ -233,10 +246,11 @@ export default function CreateSourceChannelModal({ isOpen, onClose }: CreateSour
                 className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white"
                 disabled={loading}
               >
-                <option value={ContentType.VA_SANS_EDIT}>VA Sans Édition</option>
-                <option value={ContentType.VA_AVEC_EDIT}>VA Avec Édition</option>
-                <option value={ContentType.VF_SANS_EDIT}>VF Sans Édition</option>
-                <option value={ContentType.VF_AVEC_EDIT}>VF Avec Édition</option>
+                {getSourceContentTypes().map((type) => (
+                  <option key={type} value={type}>
+                    {getContentTypeLabel(type)}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
