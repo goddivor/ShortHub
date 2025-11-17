@@ -2,6 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useMutation } from '@apollo/client/react';
+import { type FetchResult } from '@apollo/client';
 import { UPLOAD_PROFILE_IMAGE_MUTATION, REMOVE_PROFILE_IMAGE_MUTATION, UPDATE_USER_MUTATION, CHANGE_PASSWORD_MUTATION } from '@/lib/graphql';
 import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
@@ -65,7 +66,7 @@ const AdminProfilePage: React.FC = () => {
     }
   });
 
-  const [changePassword] = useMutation(CHANGE_PASSWORD_MUTATION);
+  const [changePassword] = useMutation<{ changePassword: boolean }>(CHANGE_PASSWORD_MUTATION);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -130,16 +131,23 @@ const AdminProfilePage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const result = await changePassword({
+      const result: FetchResult<{ changePassword: boolean }> = await changePassword({
         variables: {
           oldPassword,
           newPassword
         }
       });
 
+      const { data, errors: apolloErrors } = result;
+
       // Vérifier s'il y a des erreurs GraphQL
-      if (result.errors && result.errors.length > 0) {
-        error('Erreur', result.errors[0].message || 'Erreur lors de la modification du mot de passe');
+      if (apolloErrors && apolloErrors.length > 0) {
+        error('Erreur', apolloErrors[0].message || 'Erreur lors de la modification du mot de passe');
+        return;
+      }
+
+      if (!data) {
+        error('Erreur', 'Aucune donnée retournée');
         return;
       }
 
@@ -149,8 +157,8 @@ const AdminProfilePage: React.FC = () => {
       setConfirmPassword('');
       setIsEditingPassword(false);
       success('Mot de passe modifié', 'Votre mot de passe a été modifié avec succès');
-    } catch (err: any) {
-      error('Erreur', err.message || 'Erreur lors de la modification du mot de passe');
+    } catch (err) {
+      error('Erreur', err instanceof Error ? err.message : 'Erreur lors de la modification du mot de passe');
     } finally {
       setIsSubmitting(false);
     }
