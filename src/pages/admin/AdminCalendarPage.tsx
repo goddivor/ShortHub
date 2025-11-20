@@ -35,11 +35,12 @@ export default function AdminCalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  // Récupérer tous les shorts assignés avec deadline
+  // Récupérer tous les shorts assignés avec deadline (tous statuts sauf ROLLED, RETAINED, REJECTED)
   const { data, loading } = useQuery<{ shorts: Short[] }>(GET_SHORTS_QUERY, {
     variables: {
       filter: {
-        status: ShortStatus.ASSIGNED,
+        // Ne pas filtrer par statut pour afficher tous les shorts assignés
+        // (ASSIGNED, IN_PROGRESS, COMPLETED, VALIDATED, PUBLISHED)
       },
     },
   });
@@ -316,18 +317,36 @@ export default function AdminCalendarPage() {
           {/* Month days */}
           {daysInMonth.map((date) => {
             const count = getShortsCountForDate(date);
+            const dateKey = format(date, 'yyyy-MM-dd');
+            const dayShorts = shortsByDate.get(dateKey) || [];
             return (
               <div
                 key={date.toISOString()}
                 onClick={() => handleDateClick(date)}
                 className={getDateClassName(date)}
               >
-                <div className="font-semibold text-gray-900">{format(date, 'd')}</div>
+                <div className="font-semibold text-gray-900 mb-1">{format(date, 'd')}</div>
                 {count > 0 && (
-                  <div className="mt-1">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                      {count} short{count > 1 ? 's' : ''}
-                    </span>
+                  <div className="space-y-1">
+                    {dayShorts.slice(0, 3).map((short) => (
+                      <div
+                        key={short.id}
+                        className="px-1.5 py-0.5 rounded text-xs font-medium truncate"
+                        style={{
+                          backgroundColor: `${STATUS_COLORS[short.status]}20`,
+                          color: STATUS_COLORS[short.status],
+                          border: `1px solid ${STATUS_COLORS[short.status]}40`,
+                        }}
+                        title={`${short.title || 'Sans titre'} - ${STATUS_LABELS[short.status]}`}
+                      >
+                        {short.title || short.sourceChannel.channelName}
+                      </div>
+                    ))}
+                    {dayShorts.length > 3 && (
+                      <div className="text-xs text-gray-500 text-center">
+                        +{dayShorts.length - 3}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
