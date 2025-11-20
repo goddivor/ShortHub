@@ -6,6 +6,9 @@ import SpinLoader from '@/components/SpinLoader';
 import { VideoPlay, Play, TickCircle, Send2, TaskSquare, Chart } from 'iconsax-react';
 import RollShortModal from '@/components/admin/rolling/RollShortModal';
 import AssignShortModal from '@/components/admin/rolling/AssignShortModal';
+import FloatingFilter from '@/components/admin/rolling/FloatingFilter';
+import RandomButton from '@/components/admin/rolling/RandomButton';
+import { FilterState, filterChannelsByContentType } from '@/lib/filterHelpers';
 
 // Helper pour afficher les types abrégés
 const getContentTypeShort = (contentType: ContentType): string => {
@@ -38,6 +41,10 @@ export default function AdminRollingPage() {
   const [isRollModalOpen, setIsRollModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [retainedShort, setRetainedShort] = useState<Short | null>(null);
+  const [filters, setFilters] = useState<FilterState>({
+    language: 'ALL',
+    edit: 'ALL',
+  });
 
   const { data, loading } = useQuery<{ sourceChannels: SourceChannel[] }>(
     GET_SOURCE_CHANNELS_QUERY
@@ -49,6 +56,13 @@ export default function AdminRollingPage() {
 
   const handleRollShort = (channel: SourceChannel) => {
     setSelectedChannel(channel);
+    setIsRollModalOpen(true);
+  };
+
+  const handleRandomSelect = (channel: SourceChannel) => {
+    // Sélectionner la chaîne
+    setSelectedChannel(channel);
+    // Ouvrir automatiquement le modal de génération
     setIsRollModalOpen(true);
   };
 
@@ -74,6 +88,7 @@ export default function AdminRollingPage() {
   }
 
   const sourceChannels = data?.sourceChannels || [];
+  const filteredChannels = filterChannelsByContentType(sourceChannels, filters);
 
   return (
     <div className="p-6 space-y-6">
@@ -165,17 +180,21 @@ export default function AdminRollingPage() {
       </div>
 
       {/* Source Channels Grid */}
-      {sourceChannels.length === 0 ? (
+      {filteredChannels.length === 0 ? (
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-12 text-center">
           <VideoPlay size={64} color="#9CA3AF" className="mx-auto mb-4" variant="Bulk" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucune chaîne source</h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            {sourceChannels.length === 0 ? 'Aucune chaîne source' : 'Aucune chaîne ne correspond aux filtres'}
+          </h3>
           <p className="text-gray-500">
-            Ajoutez des chaînes sources depuis la page "Chaînes Sources" pour commencer à roller des shorts.
+            {sourceChannels.length === 0
+              ? 'Ajoutez des chaînes sources depuis la page "Chaînes Sources" pour commencer à roller des shorts.'
+              : 'Essayez de modifier vos critères de filtrage pour voir plus de chaînes.'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {sourceChannels.map((channel) => (
+          {filteredChannels.map((channel) => (
             <div
               key={channel.id}
               className={`bg-white rounded-xl shadow-lg border-2 transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 cursor-pointer ${
@@ -259,6 +278,15 @@ export default function AdminRollingPage() {
         onClose={() => setIsAssignModalOpen(false)}
         short={retainedShort}
         onAssigned={handleShortAssigned}
+      />
+
+      {/* Floating Filter */}
+      <FloatingFilter onFilterChange={setFilters} />
+
+      {/* Random Button */}
+      <RandomButton
+        filteredChannels={filteredChannels}
+        onRandomSelect={handleRandomSelect}
       />
     </div>
   );
