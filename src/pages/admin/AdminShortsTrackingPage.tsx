@@ -365,7 +365,11 @@ const AdminShortsTrackingPage: React.FC = () => {
         <div className="grid grid-cols-1 gap-4">
           {filteredShorts.map((short) => {
             const statusConfig = getStatusConfig(short.status);
-            const isLate = short.deadline ? isPast(new Date(short.deadline)) && short.status !== ShortStatus.COMPLETED : false;
+
+            // Statuts où le travail est terminé (pas besoin d'afficher deadline)
+            const completedStatuses = [ShortStatus.COMPLETED, ShortStatus.VALIDATED, ShortStatus.PUBLISHED];
+            const isCompleted = completedStatuses.includes(short.status);
+            const isLate = short.deadline && !isCompleted ? isPast(new Date(short.deadline)) : false;
 
             return (
               <div
@@ -420,7 +424,8 @@ const AdminShortsTrackingPage: React.FC = () => {
                           {short.assignedTo?.username || 'Non assigné'}
                         </p>
                       </div>
-                      {short.deadline && (
+                      {/* Afficher la deadline seulement si le short n'est pas terminé */}
+                      {short.deadline && !isCompleted && (
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Deadline</p>
                           <p className="text-sm font-medium text-gray-900">

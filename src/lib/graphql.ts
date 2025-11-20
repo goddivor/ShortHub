@@ -960,6 +960,9 @@ export const GET_SHORTS_QUERY = gql`
         channelName
         profileImageUrl
       }
+      isLate
+      daysUntilDeadline
+      timeToComplete
       createdAt
       updatedAt
     }
@@ -1015,6 +1018,9 @@ export const GET_SHORT_QUERY = gql`
         comment
         createdAt
       }
+      isLate
+      daysUntilDeadline
+      timeToComplete
       createdAt
       updatedAt
     }
@@ -1200,6 +1206,9 @@ export const GET_MY_SHORTS_QUERY = gql`
         id
         username
       }
+      isLate
+      daysUntilDeadline
+      timeToComplete
       createdAt
       updatedAt
     }

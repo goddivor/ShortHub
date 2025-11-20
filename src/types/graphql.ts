@@ -159,6 +159,9 @@ export interface Short {
   notes?: string;
   adminFeedback?: string;
   comments?: ShortComment[];
+  isLate: boolean;
+  daysUntilDeadline?: number;
+  timeToComplete?: number;
   createdAt: string;
   updatedAt: string;
 }

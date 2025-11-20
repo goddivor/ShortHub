@@ -145,7 +145,10 @@ const VideasteCalendarPage: React.FC = () => {
       inProgress: monthShorts.filter((s) => s.status === ShortStatus.IN_PROGRESS).length,
       completed: monthShorts.filter((s) => s.status === ShortStatus.COMPLETED).length,
       late: monthShorts.filter((s) => {
-        if (!s.deadline || s.status === ShortStatus.COMPLETED) return false;
+        if (!s.deadline) return false;
+        // Statuts où le travail est terminé
+        const completedStatuses = [ShortStatus.COMPLETED, ShortStatus.VALIDATED, ShortStatus.PUBLISHED];
+        if (completedStatuses.includes(s.status)) return false;
         return isPast(new Date(s.deadline));
       }).length,
     };
@@ -290,7 +293,10 @@ const VideasteCalendarPage: React.FC = () => {
                     {/* Shorts for this day */}
                     <div className="space-y-1">
                       {dayShorts.slice(0, 3).map((short) => {
-                        const isLate = isPast(new Date(short.deadline!)) && short.status !== ShortStatus.COMPLETED;
+                        // Statuts où le travail est terminé
+                        const completedStatuses = [ShortStatus.COMPLETED, ShortStatus.VALIDATED, ShortStatus.PUBLISHED];
+                        const isCompleted = completedStatuses.includes(short.status);
+                        const isLate = !isCompleted && isPast(new Date(short.deadline!));
                         return (
                           <div
                             key={short.id}
@@ -342,7 +348,10 @@ const VideasteCalendarPage: React.FC = () => {
           ) : (
             <div className="space-y-3">
               {getShortsForDate(selectedDate).map((short) => {
-                const isLate = isPast(new Date(short.deadline!)) && short.status !== ShortStatus.COMPLETED;
+                // Statuts où le travail est terminé
+                const completedStatuses = [ShortStatus.COMPLETED, ShortStatus.VALIDATED, ShortStatus.PUBLISHED];
+                const isCompleted = completedStatuses.includes(short.status);
+                const isLate = !isCompleted && isPast(new Date(short.deadline!));
                 return (
                   <div
                     key={short.id}

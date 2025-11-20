@@ -58,12 +58,16 @@ const ShortCard: React.FC<ShortCardProps> = ({
 
   const statusConfig = getStatusConfig(short.status);
 
+  // Statuts où le travail est terminé (pas besoin d'afficher deadline)
+  const completedStatuses = [ShortStatus.COMPLETED, ShortStatus.VALIDATED, ShortStatus.PUBLISHED];
+  const isCompleted = completedStatuses.includes(short.status);
+
   // Calculate days until deadline
   const daysUntilDeadline = short.deadline
     ? differenceInDays(new Date(short.deadline), new Date())
     : null;
 
-  const isLate = short.deadline ? isPast(new Date(short.deadline)) && short.status !== ShortStatus.COMPLETED : false;
+  const isLate = short.deadline && !isCompleted ? isPast(new Date(short.deadline)) : false;
 
   const getDeadlineColor = () => {
     if (isLate) return 'text-red-600 bg-red-50';
@@ -89,7 +93,8 @@ const ShortCard: React.FC<ShortCardProps> = ({
           )}
         </div>
 
-        {short.deadline && (
+        {/* Afficher la deadline seulement si le short n'est pas terminé */}
+        {short.deadline && !isCompleted && (
           <div className={`flex items-center gap-2 text-xs font-medium px-2 py-1.5 rounded-lg ${getDeadlineColor()}`}>
             <Calendar size={14} variant="Bold" />
             <span>
