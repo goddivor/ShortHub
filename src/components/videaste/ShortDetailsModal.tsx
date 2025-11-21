@@ -1,9 +1,6 @@
 // src/components/videaste/ShortDetailsModal.tsx
 import React, { useState } from 'react';
-import { useMutation } from '@apollo/client/react';
 import { Short, ShortStatus } from '@/types/graphql';
-import { CREATE_SHORT_COMMENT_MUTATION } from '@/lib/graphql';
-import { useToast } from '@/context/toast-context';
 import {
   CloseCircle,
   VideoPlay,
@@ -11,21 +8,21 @@ import {
   Youtube,
   User,
   Play,
-  TickCircle,
+  DocumentUpload,
   DocumentText,
-  MessageText,
-  Send
+  MessageText
 } from 'iconsax-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import SpinLoader from '@/components/SpinLoader';
+import VideoUploadModal from './VideoUploadModal';
+import SpinLoader from '../SpinLoader';
 
 interface ShortDetailsModalProps {
   isOpen: boolean;
   short: Short | null;
   onClose: () => void;
   onStart?: (short: Short) => void;
-  onComplete?: (short: Short) => void;
+  onUploadSuccess?: () => void;
   loading?: boolean;
 }
 
@@ -34,27 +31,10 @@ const ShortDetailsModal: React.FC<ShortDetailsModalProps> = ({
   short,
   onClose,
   onStart,
-  onComplete,
+  onUploadSuccess,
   loading = false
 }) => {
-  const [comment, setComment] = useState('');
-  const { success, error } = useToast();
-
-  // Mutation pour créer un commentaire
-  const [createComment, { loading: submittingComment }] = useMutation(
-    CREATE_SHORT_COMMENT_MUTATION,
-    {
-      onCompleted: () => {
-        success('Commentaire ajouté', 'Votre commentaire a été envoyé');
-        setComment('');
-      },
-      onError: (err) => {
-        error('Erreur', err.message || 'Impossible d\'ajouter le commentaire');
-      },
-      // Rafraîchir les données du short pour afficher le nouveau commentaire
-      refetchQueries: ['GetMyShorts', 'GetShort'],
-    }
-  );
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   if (!isOpen || !short) return null;
 
@@ -84,23 +64,6 @@ const ShortDetailsModal: React.FC<ShortDetailsModalProps> = ({
   };
 
   const statusConfig = getStatusConfig(short.status);
-
-  const handleAddComment = async () => {
-    if (!comment.trim()) return;
-
-    try {
-      await createComment({
-        variables: {
-          input: {
-            shortId: short.id,
-            comment: comment.trim(),
-          },
-        },
-      });
-    } catch {
-      // L'erreur est déjà gérée dans le onError de la mutation
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -248,64 +211,6 @@ const ShortDetailsModal: React.FC<ShortDetailsModalProps> = ({
             </div>
           )}
 
-          {/* Comments Section */}
-          {short.comments && short.comments.length > 0 && (
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
-                <MessageText size={16} color="#111827" variant="Bold" />
-                <span>Commentaires</span>
-              </div>
-              <div className="space-y-3">
-                {short.comments.map((comment) => (
-                  <div key={comment.id} className="bg-white rounded-lg p-3 border border-gray-200">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold text-gray-900">{comment.author.username}</span>
-                      <span className="text-xs text-gray-500">
-                        {format(new Date(comment.createdAt), 'PPp', { locale: fr })}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-700">{comment.comment}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Add Comment */}
-          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
-              <MessageText size={16} color="#111827" variant="Bold" />
-              <span>Ajouter un commentaire</span>
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Votre commentaire..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                onKeyPress={(e) => e.key === 'Enter' && !submittingComment && handleAddComment()}
-                disabled={submittingComment}
-              />
-              <button
-                onClick={handleAddComment}
-                disabled={!comment.trim() || submittingComment}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-              >
-                {submittingComment ? (
-                  <>
-                    <SpinLoader />
-                    <span>Envoi...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send size={18} color="white" variant="Bold" />
-                    <span>Envoyer</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4 border-t border-gray-200">
@@ -337,27 +242,42 @@ const ShortDetailsModal: React.FC<ShortDetailsModalProps> = ({
               </button>
             )}
 
-            {short.status === ShortStatus.IN_PROGRESS && onComplete && (
+            {short.status === ShortStatus.IN_PROGRESS && (
               <button
-                onClick={() => onComplete(short)}
+                onClick={() => setIsUploadModalOpen(true)}
                 disabled={loading}
                 className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg"
               >
-                {loading ? (
-                  <>
-                    <SpinLoader />
-                    <span>Finalisation...</span>
-                  </>
-                ) : (
-                  <>
-                    <TickCircle size={20} color="white" variant="Bold" />
-                    <span>Marquer terminé</span>
-                  </>
-                )}
+                <DocumentUpload size={20} color="white" variant="Bold" />
+                <span>Upload vidéo</span>
+              </button>
+            )}
+
+            {short.status === ShortStatus.REJECTED && (
+              <button
+                onClick={() => setIsUploadModalOpen(true)}
+                disabled={loading}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-lg font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg"
+              >
+                <DocumentUpload size={20} color="white" variant="Bold" />
+                <span>Re-uploader</span>
               </button>
             )}
           </div>
         </div>
+
+        {/* Upload Modal */}
+        {short && (
+          <VideoUploadModal
+            short={short}
+            isOpen={isUploadModalOpen}
+            onClose={() => setIsUploadModalOpen(false)}
+            onUploadSuccess={() => {
+              setIsUploadModalOpen(false);
+              onUploadSuccess?.();
+            }}
+          />
+        )}
       </div>
     </div>
   );

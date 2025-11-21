@@ -133,15 +133,8 @@ const VideasteShortsPage: React.FC = () => {
     });
   };
 
-  const handleCompleteShort = (short: Short) => {
-    updateShortStatus({
-      variables: {
-        input: {
-          shortId: short.id,
-          status: ShortStatus.COMPLETED,
-        },
-      },
-    });
+  const handleUploadSuccess = () => {
+    refetch();
   };
 
   return (
@@ -283,7 +276,7 @@ const VideasteShortsPage: React.FC = () => {
               short={short}
               onViewDetails={handleViewDetails}
               onStart={handleStartShort}
-              onComplete={handleCompleteShort}
+              onUploadSuccess={handleUploadSuccess}
             />
           ))}
         </div>
@@ -298,7 +291,7 @@ const VideasteShortsPage: React.FC = () => {
           setSelectedShort(null);
         }}
         onStart={handleStartShort}
-        onComplete={handleCompleteShort}
+        onUploadSuccess={handleUploadSuccess}
         loading={updateLoading}
       />
     </div>

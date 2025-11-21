@@ -1,6 +1,7 @@
 // src/components/videaste/ShortCard.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Short, ShortStatus } from '@/types/graphql';
+import { getAuthToken } from '@/lib/apollo-client';
 import {
   VideoPlay,
   Calendar,
@@ -9,24 +10,64 @@ import {
   TickCircle,
   Play,
   Eye,
-  CloseCircle
+  CloseCircle,
+  DocumentUpload,
+  DocumentDownload
 } from 'iconsax-react';
 import { format, differenceInDays, isPast } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import VideoUploadModal from './VideoUploadModal';
 
 interface ShortCardProps {
   short: Short;
   onViewDetails: (short: Short) => void;
   onStart?: (short: Short) => void;
-  onComplete?: (short: Short) => void;
+  onUploadSuccess?: () => void;
 }
 
 const ShortCard: React.FC<ShortCardProps> = ({
   short,
   onViewDetails,
   onStart,
-  onComplete
+  onUploadSuccess
 }) => {
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  const handleDownload = () => {
+    const token = getAuthToken();
+    if (!token) {
+      alert('Non authentifié');
+      return;
+    }
+
+    const url = `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/drive/download/${short.id}`;
+
+    // Créer un lien temporaire pour télécharger
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = short.fileName || 'video.mp4';
+
+    // Ajouter le token dans les headers via fetch puis télécharger
+    fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+      .then(response => response.blob())
+      .then(blob => {
+        const blobUrl = window.URL.createObjectURL(blob);
+        link.href = blobUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      })
+      .catch(error => {
+        console.error('Download error:', error);
+        alert('Erreur lors du téléchargement');
+      });
+  };
+
   const getStatusConfig = (status: ShortStatus) => {
     switch (status) {
       case ShortStatus.ASSIGNED:
@@ -198,17 +239,49 @@ const ShortCard: React.FC<ShortCardProps> = ({
             </button>
           )}
 
-          {short.status === ShortStatus.IN_PROGRESS && onComplete && (
+          {short.status === ShortStatus.IN_PROGRESS && (
             <button
-              onClick={() => onComplete(short)}
+              onClick={() => setIsUploadModalOpen(true)}
               className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-md"
             >
-              <TickCircle size={18} color="white" variant="Bold" />
-              <span>terminé</span>
+              <DocumentUpload size={18} color="white" variant="Bold" />
+              <span>Upload vidéo</span>
+            </button>
+          )}
+
+          {short.status === ShortStatus.REJECTED && (
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-md"
+            >
+              <DocumentUpload size={18} color="white" variant="Bold" />
+              <span>Re-uploader</span>
+            </button>
+          )}
+
+          {/* Bouton télécharger pour les shorts avec fichier uploadé */}
+          {short.driveFileId && [ShortStatus.COMPLETED, ShortStatus.VALIDATED, ShortStatus.PUBLISHED, ShortStatus.REJECTED].includes(short.status) && (
+            <button
+              onClick={handleDownload}
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-md"
+            >
+              <DocumentDownload size={18} color="white" variant="Bold" />
+              <span>Télécharger</span>
             </button>
           )}
         </div>
       </div>
+
+      {/* Upload Modal */}
+      <VideoUploadModal
+        short={short}
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUploadSuccess={() => {
+          setIsUploadModalOpen(false);
+          onUploadSuccess?.();
+        }}
+      />
     </div>
   );
 };

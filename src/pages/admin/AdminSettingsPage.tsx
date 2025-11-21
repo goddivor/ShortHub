@@ -1,9 +1,13 @@
 // src/pages/admin/AdminSettingsPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
+import { useSearchParams } from 'react-router';
 import {
   GET_NOTIFICATION_SETTINGS_QUERY,
   UPDATE_NOTIFICATION_SETTINGS_MUTATION,
+  GET_GOOGLE_DRIVE_CONNECTION_INFO_QUERY,
+  GET_GOOGLE_DRIVE_AUTH_URL_MUTATION,
+  DISCONNECT_GOOGLE_DRIVE_MUTATION,
 } from '@/lib/graphql';
 import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
@@ -15,11 +19,16 @@ import {
   TickCircle,
   InfoCircle,
   Danger,
+  Google,
+  Link2,
+  Trash,
+  FolderOpen,
 } from 'iconsax-react';
 
 const AdminSettingsPage: React.FC = () => {
   const { success, error } = useToast();
   const [hasChanges, setHasChanges] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Fetch notification settings
   const { data, loading, refetch } = useQuery<{
@@ -29,6 +38,63 @@ const AdminSettingsPage: React.FC = () => {
       whatsappNotificationsEnabled: boolean;
     }
   }>(GET_NOTIFICATION_SETTINGS_QUERY);
+
+  // Fetch Google Drive connection info
+  const {
+    data: driveData,
+    loading: driveLoading,
+    refetch: refetchDrive,
+  } = useQuery<{
+    googleDriveConnectionInfo: {
+      isConnected: boolean;
+      rootFolderId?: string;
+      rootFolderName?: string;
+      lastSync?: string;
+    };
+  }>(GET_GOOGLE_DRIVE_CONNECTION_INFO_QUERY);
+
+  // Google Drive mutations
+  const [getAuthUrl, { loading: gettingAuthUrl }] = useMutation<{
+    getGoogleDriveAuthUrl: string;
+  }>(GET_GOOGLE_DRIVE_AUTH_URL_MUTATION, {
+    onCompleted: (data) => {
+      // Redirect to Google OAuth
+      window.location.href = data.getGoogleDriveAuthUrl;
+    },
+    onError: (err) => {
+      error('Erreur', err.message || 'Impossible de générer l\'URL d\'autorisation');
+    },
+  });
+
+  const [disconnectDrive, { loading: disconnecting }] = useMutation(
+    DISCONNECT_GOOGLE_DRIVE_MUTATION,
+    {
+      onCompleted: () => {
+        success('Déconnecté', 'Google Drive a été déconnecté avec succès');
+        refetchDrive();
+      },
+      onError: (err) => {
+        error('Erreur', err.message || 'Impossible de déconnecter Google Drive');
+      },
+    }
+  );
+
+  // Handle OAuth callback
+  useEffect(() => {
+    const driveStatus = searchParams.get('drive');
+    if (driveStatus === 'connected') {
+      success('Connecté', 'Google Drive a été connecté avec succès');
+      refetchDrive();
+      // Remove the query parameter
+      searchParams.delete('drive');
+      setSearchParams(searchParams);
+    } else if (driveStatus === 'error') {
+      error('Erreur', 'Échec de la connexion à Google Drive');
+      // Remove the query parameter
+      searchParams.delete('drive');
+      setSearchParams(searchParams);
+    }
+  }, [searchParams, setSearchParams, success, error, refetchDrive]);
 
   // Local state for settings
   const [platformNotificationsEnabled, setPlatformNotificationsEnabled] = useState(
@@ -351,6 +417,182 @@ const AdminSettingsPage: React.FC = () => {
                 )}
               </button>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Google Drive Integration Card */}
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <Google size={20} color="#111827" variant="Bold" />
+            Intégration Google Drive
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Connectez votre compte Google Drive pour centraliser les vidéos
+          </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {driveLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <SpinLoader />
+            </div>
+          ) : (
+            <>
+              {/* Info Banner */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+                <InfoCircle size={24} color="#3B82F6" variant="Bold" className="flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">
+                    Comment ça fonctionne ?
+                  </p>
+                  <ul className="text-xs text-blue-700 mt-2 space-y-1 list-disc list-inside">
+                    <li>Connectez votre compte Google Drive à la plateforme</li>
+                    <li>Un dossier "ShortHub" sera créé automatiquement</li>
+                    <li>Les vidéastes peuvent uploader leurs vidéos directement</li>
+                    <li>Les fichiers sont organisés par vidéaste et par short</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Connection Status */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${
+                        driveData?.googleDriveConnectionInfo?.isConnected
+                          ? 'bg-green-100'
+                          : 'bg-gray-200'
+                      }`}>
+                        <Link2
+                          size={20}
+                          color={
+                            driveData?.googleDriveConnectionInfo?.isConnected
+                              ? '#10B981'
+                              : '#6B7280'
+                          }
+                          variant="Bold"
+                        />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">
+                          Statut de la connexion
+                        </h3>
+                        <p className="text-xs text-gray-600">
+                          {driveData?.googleDriveConnectionInfo?.isConnected
+                            ? 'Compte Google Drive connecté'
+                            : 'Aucun compte connecté'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Status Badge */}
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        driveData?.googleDriveConnectionInfo?.isConnected
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {driveData?.googleDriveConnectionInfo?.isConnected
+                        ? 'Connecté'
+                        : 'Non connecté'}
+                    </span>
+                  </div>
+                </div>
+
+                {driveData?.googleDriveConnectionInfo?.isConnected && (
+                  <div className="px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600">Dossier racine :</span>
+                      <span className="font-mono text-gray-900">
+                        {driveData.googleDriveConnectionInfo.rootFolderName || 'ShortHub'}
+                      </span>
+                    </div>
+                    {driveData.googleDriveConnectionInfo.lastSync && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600">Dernière synchronisation :</span>
+                        <span className="text-gray-900">
+                          {new Date(
+                            driveData.googleDriveConnectionInfo.lastSync
+                          ).toLocaleString('fr-FR')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                {driveData?.googleDriveConnectionInfo?.isConnected ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        const folderId =
+                          driveData.googleDriveConnectionInfo.rootFolderId;
+                        if (folderId) {
+                          window.open(
+                            `https://drive.google.com/drive/folders/${folderId}`,
+                            '_blank'
+                          );
+                        }
+                      }}
+                      disabled={!driveData.googleDriveConnectionInfo.rootFolderId}
+                      className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <FolderOpen size={18} color="#374151" variant="Bold" />
+                      <span>Ouvrir dans Drive</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            'Êtes-vous sûr de vouloir déconnecter Google Drive ? Les vidéos déjà uploadées resteront accessibles.'
+                          )
+                        ) {
+                          disconnectDrive();
+                        }
+                      }}
+                      disabled={disconnecting}
+                      className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                    >
+                      {disconnecting ? (
+                        <>
+                          <SpinLoader />
+                          <span>Déconnexion...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Trash size={18} color="white" variant="Bold" />
+                          <span>Déconnecter</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => getAuthUrl()}
+                    disabled={gettingAuthUrl}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg"
+                  >
+                    {gettingAuthUrl ? (
+                      <>
+                        <SpinLoader />
+                        <span>Connexion en cours...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Google size={20} color="white" variant="Bold" />
+                        <span>Connecter Google Drive</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
