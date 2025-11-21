@@ -77,11 +77,6 @@ const VideasteProfilePage: React.FC = () => {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      error('Erreur', 'L\'image ne doit pas dépasser 5 MB');
-      return;
-    }
-
     try {
       const reader = new FileReader();
       reader.onloadend = async () => {

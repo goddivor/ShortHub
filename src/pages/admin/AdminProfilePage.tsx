@@ -78,12 +78,6 @@ const AdminProfilePage: React.FC = () => {
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      error('Erreur', 'L\'image ne doit pas dépasser 5 MB');
-      return;
-    }
-
     try {
       // Convert to base64
       const reader = new FileReader();
