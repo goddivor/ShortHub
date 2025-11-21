@@ -162,6 +162,14 @@ export interface Short {
   isLate: boolean;
   daysUntilDeadline?: number;
   timeToComplete?: number;
+  // Google Drive fields
+  driveFileId?: string;
+  driveFileUrl?: string;
+  driveFolderId?: string;
+  uploadedAt?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -517,6 +525,14 @@ export interface UpdateNotificationSettingsInput {
   platformNotificationsEnabled?: boolean;
   emailNotificationsEnabled?: boolean;
   whatsappNotificationsEnabled?: boolean;
+}
+
+// Google Drive Connection Info
+export interface GoogleDriveConnectionInfo {
+  isConnected: boolean;
+  rootFolderId?: string;
+  rootFolderName?: string;
+  lastSync?: string;
 }
 
 // Utility types

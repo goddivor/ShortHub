@@ -1,9 +1,10 @@
 // src/pages/admin/AdminShortsTrackingPage.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
-import { GET_SHORTS_QUERY, UPDATE_SHORT_STATUS_MUTATION, CREATE_SHORT_COMMENT_MUTATION } from '@/lib/graphql';
+import { GET_SHORTS_QUERY, UPDATE_SHORT_STATUS_MUTATION } from '@/lib/graphql';
 import { Short, ShortStatus, ShortFilterInput } from '@/types/graphql';
 import { useToast } from '@/context/toast-context';
+import { getAuthToken } from '@/lib/apollo-client';
 import SpinLoader from '@/components/SpinLoader';
 import {
   VideoPlay,
@@ -16,8 +17,7 @@ import {
   Eye,
   Send2,
   DocumentText,
-  MessageText,
-  Send
+  DocumentDownload
 } from 'iconsax-react';
 import { format, isPast } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -31,7 +31,10 @@ const AdminShortsTrackingPage: React.FC = () => {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [adminFeedback, setAdminFeedback] = useState('');
   const [rejectReason, setRejectReason] = useState('');
-  const [comment, setComment] = useState('');
+  const [deleteFileOnReject, setDeleteFileOnReject] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [loadingVideo, setLoadingVideo] = useState(false);
+  const [videoPreviewOpen, setVideoPreviewOpen] = useState(false);
 
   // Build filter for assigned/in-progress/completed shorts
   const filter: ShortFilterInput = useMemo(() => {
@@ -60,29 +63,19 @@ const AdminShortsTrackingPage: React.FC = () => {
       setModalOpen(false);
       setSelectedShort(null);
       setAdminFeedback('');
-      setComment('');
+      // Cleanup video URL
+      if (videoUrl) {
+        window.URL.revokeObjectURL(videoUrl);
+        setVideoUrl(null);
+      }
     },
     onError: (err) => {
       error(err.message || 'Erreur lors de la mise à jour du statut');
     },
   });
 
-  // Create comment mutation
-  const [createComment, { loading: submittingComment }] = useMutation(
-    CREATE_SHORT_COMMENT_MUTATION,
-    {
-      onCompleted: () => {
-        success('Commentaire ajouté');
-        setComment('');
-        refetch();
-      },
-      onError: (err) => {
-        error('Erreur', err.message || 'Impossible d\'ajouter le commentaire');
-      },
-    }
-  );
 
-  // Filter shorts by search and only show assigned/in-progress/completed
+  // Filter shorts by search and only show assigned/in-progress/completed/rejected
   const filteredShorts = useMemo(() => {
     const shorts: Short[] = data?.shorts || [];
 
@@ -91,7 +84,8 @@ const AdminShortsTrackingPage: React.FC = () => {
       s.status === ShortStatus.IN_PROGRESS ||
       s.status === ShortStatus.COMPLETED ||
       s.status === ShortStatus.VALIDATED ||
-      s.status === ShortStatus.PUBLISHED
+      s.status === ShortStatus.PUBLISHED ||
+      s.status === ShortStatus.REJECTED
     );
 
     // Search filter
@@ -117,15 +111,26 @@ const AdminShortsTrackingPage: React.FC = () => {
       completed: filteredShorts.filter((s) => s.status === ShortStatus.COMPLETED).length,
       validated: filteredShorts.filter((s) => s.status === ShortStatus.VALIDATED).length,
       published: filteredShorts.filter((s) => s.status === ShortStatus.PUBLISHED).length,
+      rejected: filteredShorts.filter((s) => s.status === ShortStatus.REJECTED).length,
     };
   }, [filteredShorts]);
 
   const handleViewDetails = (short: Short) => {
+    // Cleanup previous video URL
+    if (videoUrl) {
+      window.URL.revokeObjectURL(videoUrl);
+      setVideoUrl(null);
+    }
     setSelectedShort(short);
     setModalOpen(true);
   };
 
   const handleValidate = (short: Short) => {
+    // Cleanup previous video URL
+    if (videoUrl) {
+      window.URL.revokeObjectURL(videoUrl);
+      setVideoUrl(null);
+    }
     setSelectedShort(short);
     setModalOpen(true);
   };
@@ -175,28 +180,82 @@ const AdminShortsTrackingPage: React.FC = () => {
           shortId: selectedShort.id,
           status: ShortStatus.REJECTED,
           adminFeedback: rejectReason.trim(),
+          deleteFile: deleteFileOnReject,
         },
       },
     });
     setRejectModalOpen(false);
     setRejectReason('');
+    setDeleteFileOnReject(false);
   };
 
-  const handleAddComment = async () => {
-    if (!comment.trim() || !selectedShort) return;
+  // Charger la vidéo pour la prévisualisation
+  useEffect(() => {
+    if (videoPreviewOpen && selectedShort?.driveFileId) {
+      setLoadingVideo(true);
+      const token = getAuthToken();
 
-    try {
-      await createComment({
-        variables: {
-          input: {
-            shortId: selectedShort.id,
-            comment: comment.trim(),
-          },
+      if (!token) {
+        setLoadingVideo(false);
+        return;
+      }
+
+      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/drive/download/${selectedShort.id}`;
+
+      fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
         },
-      });
-    } catch {
-      // L'erreur est déjà gérée dans le onError de la mutation
+      })
+        .then(response => response.blob())
+        .then(blob => {
+          const blobUrl = window.URL.createObjectURL(blob);
+          setVideoUrl(blobUrl);
+          setLoadingVideo(false);
+        })
+        .catch(() => {
+          error('Erreur lors du chargement de la vidéo');
+          setLoadingVideo(false);
+        });
+
+      // Cleanup
+      return () => {
+        if (videoUrl) {
+          window.URL.revokeObjectURL(videoUrl);
+          setVideoUrl(null);
+        }
+      };
     }
+  }, [videoPreviewOpen, selectedShort]);
+
+  const handleDownloadVideo = (shortId: string, fileName?: string) => {
+    const token = getAuthToken();
+    if (!token) {
+      error('Non authentifié');
+      return;
+    }
+
+    const url = `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/drive/download/${shortId}`;
+
+    fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+      .then(response => response.blob())
+      .then(blob => {
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName || 'video.mp4';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      })
+      .catch(() => {
+        error('Erreur lors du téléchargement');
+      });
   };
 
   const getStatusConfig = (status: ShortStatus) => {
@@ -220,6 +279,11 @@ const AdminShortsTrackingPage: React.FC = () => {
         return {
           label: 'Validé',
           color: 'bg-purple-100 text-purple-800 border-purple-200',
+        };
+      case ShortStatus.REJECTED:
+        return {
+          label: 'Rejeté',
+          color: 'bg-red-100 text-red-800 border-red-200',
         };
       case ShortStatus.PUBLISHED:
         return {
@@ -252,7 +316,7 @@ const AdminShortsTrackingPage: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600">Total</span>
@@ -291,6 +355,14 @@ const AdminShortsTrackingPage: React.FC = () => {
             <TickCircle size={20} color="#8B5CF6" variant="Bold" />
           </div>
           <p className="text-2xl font-bold text-purple-600">{stats.validated}</p>
+        </div>
+
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600">Rejetés</span>
+            <CloseCircle size={20} color="#EF4444" variant="Bold" />
+          </div>
+          <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
         </div>
 
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
@@ -338,6 +410,7 @@ const AdminShortsTrackingPage: React.FC = () => {
               <option value={ShortStatus.IN_PROGRESS}>En cours</option>
               <option value={ShortStatus.COMPLETED}>Terminés (à valider)</option>
               <option value={ShortStatus.VALIDATED}>Validés</option>
+              <option value={ShortStatus.REJECTED}>Rejetés</option>
               <option value={ShortStatus.PUBLISHED}>Publiés</option>
             </select>
           </div>
@@ -450,6 +523,14 @@ const AdminShortsTrackingPage: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Admin Feedback for rejected shorts */}
+                    {short.status === ShortStatus.REJECTED && short.adminFeedback && (
+                      <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
+                        <p className="text-xs font-semibold text-red-900 mb-1">Raison du rejet:</p>
+                        <p className="text-sm text-red-800">{short.adminFeedback}</p>
+                      </div>
+                    )}
+
                     {/* Actions */}
                     <div className="flex gap-2">
                       <button
@@ -523,7 +604,11 @@ const AdminShortsTrackingPage: React.FC = () => {
                     setModalOpen(false);
                     setSelectedShort(null);
                     setAdminFeedback('');
-                    setComment('');
+                    // Cleanup video URL
+                    if (videoUrl) {
+                      window.URL.revokeObjectURL(videoUrl);
+                      setVideoUrl(null);
+                    }
                   }}
                   disabled={updateLoading}
                   className="p-2 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
@@ -564,64 +649,41 @@ const AdminShortsTrackingPage: React.FC = () => {
                 />
               </div>
 
-              {/* Comments Section */}
-              {selectedShort.comments && selectedShort.comments.length > 0 && (
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
-                    <MessageText size={16} color="#111827" variant="Bold" />
-                    <span>Commentaires ({selectedShort.comments.length})</span>
-                  </div>
-                  <div className="space-y-3 max-h-48 overflow-y-auto">
-                    {selectedShort.comments.map((c) => (
-                      <div key={c.id} className="bg-white rounded-lg p-3 border border-gray-200">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-semibold text-gray-900">{c.author.username}</span>
-                          <span className="text-xs text-gray-500">
-                            {format(new Date(c.createdAt), 'dd MMM yyyy HH:mm', { locale: fr })}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-700">{c.comment}</p>
+              {/* Uploaded Video Section */}
+              {selectedShort.driveFileId && (
+                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm font-semibold text-green-900 mb-1">
+                        <TickCircle size={16} color="#15803D" variant="Bold" />
+                        <span>Vidéo uploadée par le vidéaste</span>
                       </div>
-                    ))}
+                      {selectedShort.fileName && (
+                        <p className="text-xs text-green-700 ml-5">
+                          {selectedShort.fileName}
+                          {selectedShort.fileSize && ` • ${(selectedShort.fileSize / 1024 / 1024).toFixed(2)} MB`}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setVideoPreviewOpen(true)}
+                        className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                      >
+                        <Eye size={16} color="white" variant="Bold" />
+                        <span>Voir la vidéo</span>
+                      </button>
+                      <button
+                        onClick={() => handleDownloadVideo(selectedShort.id, selectedShort.fileName)}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                      >
+                        <DocumentDownload size={16} color="white" variant="Bold" />
+                        <span>Télécharger</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
-
-              {/* Add Comment */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
-                  <MessageText size={16} color="#111827" variant="Bold" />
-                  <span>Ajouter un commentaire</span>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Votre commentaire..."
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    onKeyPress={(e) => e.key === 'Enter' && !submittingComment && handleAddComment()}
-                    disabled={submittingComment}
-                  />
-                  <button
-                    onClick={handleAddComment}
-                    disabled={!comment.trim() || submittingComment}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                  >
-                    {submittingComment ? (
-                      <>
-                        <SpinLoader />
-                        <span>Envoi...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send size={18} color="white" variant="Bold" />
-                        <span>Envoyer</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
 
               {/* Actions */}
               <div className="flex gap-3 pt-4 border-t border-gray-200">
@@ -630,7 +692,11 @@ const AdminShortsTrackingPage: React.FC = () => {
                     setModalOpen(false);
                     setSelectedShort(null);
                     setAdminFeedback('');
-                    setComment('');
+                    // Cleanup video URL
+                    if (videoUrl) {
+                      window.URL.revokeObjectURL(videoUrl);
+                      setVideoUrl(null);
+                    }
                   }}
                   disabled={updateLoading}
                   className="flex-1 px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors disabled:opacity-50"
@@ -739,6 +805,22 @@ const AdminShortsTrackingPage: React.FC = () => {
                 </p>
               </div>
 
+              {/* Delete File Option */}
+              {selectedShort.driveFileId && (
+                <div className="flex items-center gap-2 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <input
+                    type="checkbox"
+                    id="deleteFile"
+                    checked={deleteFileOnReject}
+                    onChange={(e) => setDeleteFileOnReject(e.target.checked)}
+                    className="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
+                  />
+                  <label htmlFor="deleteFile" className="text-sm text-gray-700 cursor-pointer">
+                    Supprimer également le fichier vidéo du Drive
+                  </label>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button
@@ -768,6 +850,151 @@ const AdminShortsTrackingPage: React.FC = () => {
                       <span>Confirmer le rejet</span>
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video Preview Modal */}
+      {videoPreviewOpen && selectedShort && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white sticky top-0 z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white/20 rounded-lg p-2">
+                    <Eye size={24} color="white" variant="Bold" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">Prévisualisation de la vidéo</h2>
+                    <p className="text-blue-100 text-sm mt-1">
+                      Vidéo uploadée par le vidéaste
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setVideoPreviewOpen(false);
+                    // Cleanup video URL
+                    if (videoUrl) {
+                      window.URL.revokeObjectURL(videoUrl);
+                      setVideoUrl(null);
+                    }
+                  }}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <CloseCircle size={24} color="white" variant="Bold" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Video Player */}
+              <div className="aspect-video bg-black rounded-xl overflow-hidden">
+                {loadingVideo ? (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <SpinLoader />
+                      <p className="text-white mt-4">Chargement de la vidéo...</p>
+                    </div>
+                  </div>
+                ) : videoUrl ? (
+                  <video
+                    src={videoUrl}
+                    controls
+                    className="w-full h-full"
+                    controlsList="nodownload"
+                  >
+                    Votre navigateur ne supporte pas la lecture de vidéos.
+                  </video>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <p className="text-white">Impossible de charger la vidéo</p>
+                  </div>
+                )}
+              </div>
+
+              {/* File Information */}
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <DocumentText size={20} color="#374151" variant="Bold" />
+                  Informations du fichier
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {selectedShort.fileName && (
+                    <div>
+                      <p className="text-gray-500 mb-1">Nom du fichier</p>
+                      <p className="font-medium text-gray-900">{selectedShort.fileName}</p>
+                    </div>
+                  )}
+                  {selectedShort.fileSize && (
+                    <div>
+                      <p className="text-gray-500 mb-1">Taille</p>
+                      <p className="font-medium text-gray-900">
+                        {(selectedShort.fileSize / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  )}
+                  {selectedShort.mimeType && (
+                    <div>
+                      <p className="text-gray-500 mb-1">Type</p>
+                      <p className="font-medium text-gray-900">{selectedShort.mimeType}</p>
+                    </div>
+                  )}
+                  {selectedShort.uploadedAt && (
+                    <div>
+                      <p className="text-gray-500 mb-1">Date d'upload</p>
+                      <p className="font-medium text-gray-900">
+                        {format(new Date(selectedShort.uploadedAt), 'dd MMM yyyy HH:mm', { locale: fr })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Short Information */}
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h3 className="font-semibold text-blue-900 mb-2">
+                  {selectedShort.title || 'Titre non disponible'}
+                </h3>
+                <div className="flex items-center gap-4 text-sm text-blue-700">
+                  <span>Vidéaste: {selectedShort.assignedTo?.username}</span>
+                  <span>•</span>
+                  <span>Source: {selectedShort.sourceChannel.channelName}</span>
+                  {selectedShort.targetChannel && (
+                    <>
+                      <span>•</span>
+                      <span>Publication: {selectedShort.targetChannel.channelName}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => handleDownloadVideo(selectedShort.id, selectedShort.fileName)}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <DocumentDownload size={20} color="white" variant="Bold" />
+                  <span>Télécharger la vidéo</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setVideoPreviewOpen(false);
+                    // Cleanup video URL
+                    if (videoUrl) {
+                      window.URL.revokeObjectURL(videoUrl);
+                      setVideoUrl(null);
+                    }
+                  }}
+                  className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors"
+                >
+                  Fermer
                 </button>
               </div>
             </div>

@@ -960,6 +960,13 @@ export const GET_SHORTS_QUERY = gql`
         channelName
         profileImageUrl
       }
+      driveFileId
+      driveFileUrl
+      driveFolderId
+      fileName
+      fileSize
+      mimeType
+      uploadedAt
       isLate
       daysUntilDeadline
       timeToComplete
@@ -1233,5 +1240,32 @@ export const COMPLETE_SHORT_MUTATION = gql`
       completedAt
       updatedAt
     }
+  }
+`;
+
+// ============================================
+// GOOGLE DRIVE
+// ============================================
+
+export const GET_GOOGLE_DRIVE_CONNECTION_INFO_QUERY = gql`
+  query GetGoogleDriveConnectionInfo {
+    googleDriveConnectionInfo {
+      isConnected
+      rootFolderId
+      rootFolderName
+      lastSync
+    }
+  }
+`;
+
+export const GET_GOOGLE_DRIVE_AUTH_URL_MUTATION = gql`
+  mutation GetGoogleDriveAuthUrl {
+    getGoogleDriveAuthUrl
+  }
+`;
+
+export const DISCONNECT_GOOGLE_DRIVE_MUTATION = gql`
+  mutation DisconnectGoogleDrive {
+    disconnectGoogleDrive
   }
 `;
