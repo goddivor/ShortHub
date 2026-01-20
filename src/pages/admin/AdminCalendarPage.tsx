@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@apollo/client/react';
-import { GET_SHORTS_QUERY } from '@/lib/graphql';
-import { Short, ShortStatus } from '@/types/graphql';
+import { GET_SHORTS_QUERY, GET_SHORTS_STATS_QUERY } from '@/lib/graphql';
+import { Short, ShortStatus, ShortsStats } from '@/types/graphql';
 import SpinLoader from '@/components/SpinLoader';
 import { Calendar as CalendarIcon, ArrowLeft, ArrowRight, Chart, Clock } from 'iconsax-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday, isPast } from 'date-fns';
@@ -45,8 +45,11 @@ export default function AdminCalendarPage() {
     },
   });
 
-  // Récupérer tous les shorts pour les statistiques
+  // Récupérer tous les shorts pour les statistiques du timeline
   const { data: allShortsData } = useQuery<{ shorts: Short[] }>(GET_SHORTS_QUERY);
+
+  // Récupérer les stats globales (comptages cumulatifs)
+  const { data: globalStatsData } = useQuery<{ shortsStats: ShortsStats }>(GET_SHORTS_STATS_QUERY);
 
   // Générer les jours du mois
   const monthStart = startOfMonth(currentDate);
@@ -77,26 +80,24 @@ export default function AdminCalendarPage() {
     return shortsByDate.get(dateKey) || [];
   }, [selectedDate, shortsByDate]);
 
-  // Statistiques pour les charts
+  // Statistiques pour les charts - utilise les stats cumulatives de l'API
   const statsData = useMemo(() => {
-    if (!allShortsData?.shorts) return [];
+    if (!globalStatsData?.shortsStats) return [];
 
-    const statusCounts: Record<string, number> = {};
-    Object.values(ShortStatus).forEach((status) => {
-      statusCounts[status] = 0;
-    });
+    const s = globalStatsData.shortsStats;
 
-    allShortsData.shorts.forEach((short) => {
-      statusCounts[short.status]++;
-    });
-
-    return Object.entries(statusCounts).map(([status, count]) => ({
-      name: STATUS_LABELS[status as ShortStatus],
-      value: count,
-      count,
-      color: STATUS_COLORS[status as ShortStatus],
-    }));
-  }, [allShortsData]);
+    // Créer les données pour le pie chart avec les stats cumulatives
+    return [
+      { name: 'Générés', value: s.totalRolled, color: STATUS_COLORS[ShortStatus.ROLLED] },
+      { name: 'Retenus', value: s.totalRetained, color: STATUS_COLORS[ShortStatus.RETAINED] },
+      { name: 'Assignés', value: s.totalAssigned, color: STATUS_COLORS[ShortStatus.ASSIGNED] },
+      { name: 'En cours', value: s.totalInProgress, color: STATUS_COLORS[ShortStatus.IN_PROGRESS] },
+      { name: 'Complétés', value: s.totalCompleted, color: STATUS_COLORS[ShortStatus.COMPLETED] },
+      { name: 'Validés', value: s.totalValidated, color: STATUS_COLORS[ShortStatus.VALIDATED] },
+      { name: 'Publiés', value: s.totalPublished, color: STATUS_COLORS[ShortStatus.PUBLISHED] },
+      { name: 'Ignorés', value: s.totalRejected, color: STATUS_COLORS[ShortStatus.REJECTED] },
+    ];
+  }, [globalStatsData]);
 
   // Données pour le graphique de timeline
   const timelineData = useMemo(() => {

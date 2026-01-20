@@ -1,8 +1,8 @@
 // src/pages/admin/AdminShortsTrackingPage.tsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
-import { GET_SHORTS_QUERY, UPDATE_SHORT_STATUS_MUTATION } from '@/lib/graphql';
-import { Short, ShortStatus, ShortFilterInput } from '@/types/graphql';
+import { GET_SHORTS_QUERY, GET_SHORTS_STATS_QUERY, UPDATE_SHORT_STATUS_MUTATION } from '@/lib/graphql';
+import { Short, ShortStatus, ShortFilterInput, ShortsStats } from '@/types/graphql';
 import { useToast } from '@/context/toast-context';
 import { getAuthToken } from '@/lib/apollo-client';
 import SpinLoader from '@/components/SpinLoader';
@@ -55,11 +55,15 @@ const AdminShortsTrackingPage: React.FC = () => {
     variables: { filter },
   });
 
+  // Fetch global stats (cumulative counts from API)
+  const { data: statsData, refetch: refetchStats } = useQuery<{ shortsStats: ShortsStats }>(GET_SHORTS_STATS_QUERY);
+
   // Update short status mutation
   const [updateShortStatus, { loading: updateLoading }] = useMutation(UPDATE_SHORT_STATUS_MUTATION, {
     onCompleted: () => {
       success('Statut mis à jour avec succès');
       refetch();
+      refetchStats(); // Refetch global stats
       setModalOpen(false);
       setSelectedShort(null);
       setAdminFeedback('');
@@ -102,18 +106,31 @@ const AdminShortsTrackingPage: React.FC = () => {
     return filtered;
   }, [data?.shorts, searchQuery]);
 
-  // Stats
+  // Stats - utilise les stats cumulatives de l'API
   const stats = useMemo(() => {
+    if (statsData?.shortsStats) {
+      const s = statsData.shortsStats;
+      return {
+        total: s.totalRolled,           // Total de tous les shorts générés
+        assigned: s.totalAssigned,       // Shorts assignés (cumulatif)
+        inProgress: s.totalInProgress,   // Shorts actuellement en cours
+        completed: s.totalCompleted,     // Shorts terminés (cumulatif)
+        validated: s.totalValidated,     // Shorts validés (cumulatif)
+        published: s.totalPublished,     // Shorts publiés
+        rejected: s.totalRejected,       // Shorts rejetés
+      };
+    }
+    // Fallback si les stats ne sont pas encore chargées
     return {
-      total: filteredShorts.length,
-      assigned: filteredShorts.filter((s) => s.status === ShortStatus.ASSIGNED).length,
-      inProgress: filteredShorts.filter((s) => s.status === ShortStatus.IN_PROGRESS).length,
-      completed: filteredShorts.filter((s) => s.status === ShortStatus.COMPLETED).length,
-      validated: filteredShorts.filter((s) => s.status === ShortStatus.VALIDATED).length,
-      published: filteredShorts.filter((s) => s.status === ShortStatus.PUBLISHED).length,
-      rejected: filteredShorts.filter((s) => s.status === ShortStatus.REJECTED).length,
+      total: 0,
+      assigned: 0,
+      inProgress: 0,
+      completed: 0,
+      validated: 0,
+      published: 0,
+      rejected: 0,
     };
-  }, [filteredShorts]);
+  }, [statsData]);
 
   const handleViewDetails = (short: Short) => {
     // Cleanup previous video URL
