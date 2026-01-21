@@ -495,6 +495,10 @@ export const GET_USERS_QUERY = gql`
           profileImage
           emailNotifications
           whatsappNotifications
+          assignedTo {
+            id
+            username
+          }
           createdAt
         }
       }
@@ -553,6 +557,19 @@ export const DELETE_USER_MUTATION = gql`
 export const CHANGE_USER_PASSWORD_MUTATION = gql`
   mutation AdminChangeUserPassword($userId: ID!, $newPassword: String!) {
     adminChangeUserPassword(userId: $userId, newPassword: $newPassword)
+  }
+`;
+
+export const ASSIGN_ASSISTANT_MUTATION = gql`
+  mutation AssignAssistant($videasteId: ID!, $assistantId: ID!) {
+    assignAssistant(videasteId: $videasteId, assistantId: $assistantId) {
+      id
+      username
+      assignedTo {
+        id
+        username
+      }
+    }
   }
 `;
 

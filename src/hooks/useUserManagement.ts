@@ -7,7 +7,8 @@ import {
   UPDATE_USER_MUTATION,
   UPDATE_USER_STATUS_MUTATION,
   DELETE_USER_MUTATION,
-  CHANGE_USER_PASSWORD_MUTATION
+  CHANGE_USER_PASSWORD_MUTATION,
+  ASSIGN_ASSISTANT_MUTATION
 } from '@/lib/graphql';
 import { useToast } from '@/context/toast-context';
 import { UserRole, UserStatus, UsersConnection } from '@/types/graphql';
@@ -57,6 +58,10 @@ export const useUserManagement = () => {
   });
 
   const [changeUserPasswordMutation, { loading: changingPassword }] = useMutation(CHANGE_USER_PASSWORD_MUTATION, {
+    refetchQueries: [{ query: GET_USERS_QUERY }],
+  });
+
+  const [assignAssistantMutation, { loading: assigningAssistant }] = useMutation(ASSIGN_ASSISTANT_MUTATION, {
     refetchQueries: [{ query: GET_USERS_QUERY }],
   });
 
@@ -139,6 +144,22 @@ export const useUserManagement = () => {
     }
   };
 
+  const assignAssistant = async (videasteId: string, assistantId: string) => {
+    try {
+      await assignAssistantMutation({
+        variables: {
+          videasteId,
+          assistantId,
+        },
+      });
+      success('Assistant assigné', 'L\'assistant a été assigné au vidéaste avec succès');
+      return true;
+    } catch (err) {
+      error('Erreur', err instanceof Error ? err.message : 'Impossible d\'assigner l\'assistant');
+      return false;
+    }
+  };
+
   const users = data?.users.edges.map(edge => edge.node) || [];
   const totalCount = data?.users.totalCount || 0;
 
@@ -151,6 +172,7 @@ export const useUserManagement = () => {
     updatingUser,
     deleting,
     changingPassword,
+    assigningAssistant,
     filterRole,
     filterStatus,
     setFilterRole,
@@ -160,5 +182,6 @@ export const useUserManagement = () => {
     deleteUser,
     changeUserPassword,
     toggleUserStatus,
+    assignAssistant,
   };
 };

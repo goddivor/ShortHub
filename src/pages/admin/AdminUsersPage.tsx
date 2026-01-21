@@ -1,8 +1,8 @@
 // src/pages/admin/AdminUsersPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserManagement } from '@/hooks/useUserManagement';
-import { CreateUserModal, EditUserModal, DeleteUserModal, UsersTable, UsersFilters } from '@/components/admin/users';
+import { CreateUserModal, EditUserModal, DeleteUserModal, AssignAssistantModal, UsersTable, UsersFilters } from '@/components/admin/users';
 import SpinLoader from '@/components/SpinLoader';
 import { Add, People } from 'iconsax-react';
 import type { UserRole, User } from '@/types/graphql';
@@ -12,6 +12,7 @@ const AdminUsersPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const {
@@ -22,6 +23,7 @@ const AdminUsersPage: React.FC = () => {
     updatingUser,
     deleting,
     changingPassword,
+    assigningAssistant,
     filterRole,
     filterStatus,
     setFilterRole,
@@ -31,7 +33,13 @@ const AdminUsersPage: React.FC = () => {
     deleteUser,
     changeUserPassword,
     toggleUserStatus,
+    assignAssistant,
   } = useUserManagement();
+
+  // Filter videastes for the assign modal
+  const videastes = useMemo(() => {
+    return users.filter(u => u.role === 'VIDEASTE' && u.status === 'ACTIVE');
+  }, [users]);
 
   const handleCreateUser = async (data: {
     username: string;
@@ -81,6 +89,20 @@ const AdminUsersPage: React.FC = () => {
   const handleOpenDeleteModal = (user: User) => {
     setSelectedUser(user);
     setShowDeleteModal(true);
+  };
+
+  const handleOpenAssignModal = (user: User) => {
+    setSelectedUser(user);
+    setShowAssignModal(true);
+  };
+
+  const handleAssignAssistant = async (videasteId: string, assistantId: string) => {
+    const success = await assignAssistant(videasteId, assistantId);
+    if (success) {
+      setShowAssignModal(false);
+      setSelectedUser(null);
+    }
+    return success;
   };
 
   if (loading) {
@@ -165,6 +187,7 @@ const AdminUsersPage: React.FC = () => {
         onToggleStatus={toggleUserStatus}
         onEdit={handleOpenEditModal}
         onDelete={handleOpenDeleteModal}
+        onAssignAssistant={handleOpenAssignModal}
       />
 
       {/* Create User Modal */}
@@ -198,6 +221,19 @@ const AdminUsersPage: React.FC = () => {
         }}
         onConfirm={handleDeleteUser}
         isDeleting={deleting}
+      />
+
+      {/* Assign Assistant Modal */}
+      <AssignAssistantModal
+        isOpen={showAssignModal}
+        assistant={selectedUser}
+        videastes={videastes}
+        onClose={() => {
+          setShowAssignModal(false);
+          setSelectedUser(null);
+        }}
+        onConfirm={handleAssignAssistant}
+        isAssigning={assigningAssistant}
       />
     </div>
   );

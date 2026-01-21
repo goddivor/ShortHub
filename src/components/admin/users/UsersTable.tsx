@@ -1,11 +1,10 @@
 // src/components/admin/users/UsersTable.tsx
 import React from 'react';
-import { Edit2, Trash, Lock, Unlock, User as UserIcon } from 'iconsax-react';
+import { Edit2, Trash, Lock, Unlock, User as UserIcon, People } from 'iconsax-react';
 import type { UserStatus, User } from '@/types/graphql';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-// Force TypeScript reload - Uses global User interface from @/types/graphql
 interface UsersTableProps {
   users: User[];
   loading?: boolean;
@@ -13,6 +12,7 @@ interface UsersTableProps {
   onToggleStatus: (userId: string, currentStatus: UserStatus) => void;
   onEdit?: (user: User) => void;
   onDelete?: (user: User) => void;
+  onAssignAssistant?: (user: User) => void;
 }
 
 const UsersTable: React.FC<UsersTableProps> = ({
@@ -22,6 +22,7 @@ const UsersTable: React.FC<UsersTableProps> = ({
   onToggleStatus,
   onEdit,
   onDelete,
+  onAssignAssistant,
 }) => {
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
@@ -112,6 +113,11 @@ const UsersTable: React.FC<UsersTableProps> = ({
               </th>
               <th className="px-6 py-4 text-left">
                 <span className="text-sm font-bold text-gray-900 uppercase tracking-wider">
+                  Assigné à
+                </span>
+              </th>
+              <th className="px-6 py-4 text-left">
+                <span className="text-sm font-bold text-gray-900 uppercase tracking-wider">
                   Date création
                 </span>
               </th>
@@ -179,6 +185,34 @@ const UsersTable: React.FC<UsersTableProps> = ({
                   </span>
                 </td>
 
+                {/* Assigned To (for assistants) */}
+                <td className="px-6 py-4">
+                  {user.role === 'ASSISTANT' ? (
+                    user.assignedTo ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center overflow-hidden">
+                          {user.assignedTo.profileImage ? (
+                            <img
+                              src={user.assignedTo.profileImage}
+                              alt={user.assignedTo.username}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <UserIcon size={12} color="#3B82F6" variant="Bold" />
+                          )}
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">
+                          {user.assignedTo.username}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-orange-600 italic">Non assigné</span>
+                    )
+                  ) : (
+                    <span className="text-sm text-gray-400">—</span>
+                  )}
+                </td>
+
                 {/* Created Date */}
                 <td className="px-6 py-4">
                   <div>
@@ -195,6 +229,17 @@ const UsersTable: React.FC<UsersTableProps> = ({
                 <td className="px-6 py-4">
                   {user.id !== currentUserId ? (
                     <div className="flex items-center justify-end gap-2 invisible group-hover:visible transition-all">
+                      {/* Assign Assistant (only for assistants) */}
+                      {user.role === 'ASSISTANT' && (
+                        <button
+                          onClick={() => onAssignAssistant && onAssignAssistant(user)}
+                          className="p-2 rounded-lg hover:bg-cyan-50 text-cyan-600 transition-all hover:scale-110"
+                          title="Assigner à un vidéaste"
+                        >
+                          <People size={18} color="currentColor" />
+                        </button>
+                      )}
+
                       {/* Toggle Status */}
                       <button
                         onClick={() => onToggleStatus(user.id, user.status as UserStatus)}
