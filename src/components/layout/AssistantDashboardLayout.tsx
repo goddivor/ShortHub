@@ -60,6 +60,12 @@ const AssistantDashboardLayout: React.FC = () => {
       icon: <Calendar color="#06B6D4" size={20} />,
       description: 'Planning & deadlines',
     },
+    {
+      path: '/assistant/profile',
+      label: 'Profil',
+      icon: <UserTag color="#06B6D4" size={20} />,
+      description: 'Mon profil',
+    },
   ];
 
   const isActivePath = (path: string) => {

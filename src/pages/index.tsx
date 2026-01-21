@@ -16,7 +16,7 @@ import AdminSettingsPage from "./admin/AdminSettingsPage";
 import AdminProfilePage from "./admin/AdminProfilePage";
 import AdminShortsTrackingPage from "./admin/AdminShortsTrackingPage";
 import { VideasteDashboardPage, VideasteShortsPage, VideasteCalendarPage, VideasteProfilePage } from "./videaste";
-import { AssistantDashboardPage, AssistantVideosPage, AssistantCalendarPage } from "./assistant";
+import { AssistantDashboardPage, AssistantVideosPage, AssistantCalendarPage, AssistantProfilePage } from "./assistant";
 import AssistantDashboardLayout from "@/components/layout/AssistantDashboardLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { UserRole } from "@/types/graphql";
@@ -92,6 +92,7 @@ const router = createBrowserRouter([
           { path: "dashboard", element: <AssistantDashboardPage /> },
           { path: "videos", element: <AssistantVideosPage /> },
           { path: "calendar", element: <AssistantCalendarPage /> },
+          { path: "profile", element: <AssistantProfilePage /> },
         ],
       },
 
