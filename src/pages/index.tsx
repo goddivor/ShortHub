@@ -3,12 +3,8 @@ import RootLayout from "@/app.layout";
 import NotFound from "./NotFound";
 import LandingPage from "./LandingPage";
 import LoginPage from "./LoginPage";
-// import AddChannelPage from "./AddChannelPage";
-// import RollShortsPage from "./RollShortsPage";
-import DashboardLayout from "@/components/layout/DashboardLayout";
 import AdminDashboardLayout from "@/components/layout/AdminDashboardLayout";
 import VideasteDashboardLayout from "@/components/layout/VideasteDashboardLayout";
-import DashboardPage from "./DashboardPage";
 import DashboardRedirectPage from "./DashboardRedirectPage";
 import AdminDashboardPage from "./admin/AdminDashboardPage";
 import AdminUsersPage from "./admin/AdminUsersPage";
@@ -20,7 +16,8 @@ import AdminSettingsPage from "./admin/AdminSettingsPage";
 import AdminProfilePage from "./admin/AdminProfilePage";
 import AdminShortsTrackingPage from "./admin/AdminShortsTrackingPage";
 import { VideasteDashboardPage, VideasteShortsPage, VideasteCalendarPage, VideasteProfilePage } from "./videaste";
-import { AssistantDashboardPage } from "./assistant";
+import { AssistantDashboardPage, AssistantVideosPage, AssistantCalendarPage } from "./assistant";
+import AssistantDashboardLayout from "@/components/layout/AssistantDashboardLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { UserRole } from "@/types/graphql";
 
@@ -87,14 +84,14 @@ const router = createBrowserRouter([
         path: "/assistant",
         element: (
           <ProtectedRoute requireRole={UserRole.ASSISTANT}>
-            <DashboardLayout />
+            <AssistantDashboardLayout />
           </ProtectedRoute>
         ),
         children: [
           { path: "", element: <AssistantDashboardPage /> },
           { path: "dashboard", element: <AssistantDashboardPage /> },
-          { path: "videos", element: <DashboardPage /> }, // Placeholder - will create later
-          { path: "calendar", element: <DashboardPage /> }, // Placeholder - will create later
+          { path: "videos", element: <AssistantVideosPage /> },
+          { path: "calendar", element: <AssistantCalendarPage /> },
         ],
       },
 

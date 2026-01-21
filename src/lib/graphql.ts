@@ -49,6 +49,10 @@ export const ME_QUERY = gql`
       emailNotifications
       whatsappNotifications
       createdAt
+      assignedTo {
+        id
+        username
+      }
       stats {
         totalVideosAssigned
         totalVideosCompleted
