@@ -27,6 +27,12 @@ const VideasteProfilePage: React.FC = () => {
   const { user, refetchUser } = useAuth();
   const { success, error } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Username editing state
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState(user?.username || '');
+
+  // Password editing state
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -58,8 +64,6 @@ const VideasteProfilePage: React.FC = () => {
   const [updateUser, { loading: updatingUser }] = useMutation(UPDATE_USER_MUTATION, {
     onCompleted: async () => {
       await refetchUser();
-      success('Paramètres mis à jour', 'Vos paramètres de notifications ont été mis à jour avec succès');
-      setIsEditingNotifications(false);
     },
     onError: (err) => {
       error('Erreur', err.message || 'Impossible de mettre à jour les paramètres');
@@ -67,6 +71,36 @@ const VideasteProfilePage: React.FC = () => {
   });
 
   const [changePassword] = useMutation<{ changePassword: boolean }>(CHANGE_PASSWORD_MUTATION);
+
+  const handleUsernameChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (newUsername.length < 3) {
+      error('Erreur', 'Le nom d\'utilisateur doit contenir au moins 3 caractères');
+      return;
+    }
+
+    if (newUsername === user?.username) {
+      setIsEditingUsername(false);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await updateUser({
+        variables: {
+          id: user?.id,
+          input: { username: newUsername }
+        }
+      });
+      success('Nom d\'utilisateur modifié', 'Votre nom d\'utilisateur a été mis à jour avec succès');
+      setIsEditingUsername(false);
+    } catch {
+      // Error handled in mutation onError
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -181,6 +215,8 @@ const VideasteProfilePage: React.FC = () => {
           }
         }
       });
+      success('Paramètres mis à jour', 'Vos paramètres de notifications ont été mis à jour avec succès');
+      setIsEditingNotifications(false);
     } catch {
       // Error handled in mutation onError
     }
@@ -188,6 +224,7 @@ const VideasteProfilePage: React.FC = () => {
 
   React.useEffect(() => {
     if (user) {
+      setNewUsername(user.username || '');
       setEmail(user.email || '');
       setPhone(user.phone || '');
       setEmailNotifications(user.emailNotifications || false);
@@ -283,15 +320,71 @@ const VideasteProfilePage: React.FC = () => {
         </div>
 
         <div className="p-6 space-y-4">
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div className="flex-1">
-              <label className="block text-sm font-semibold text-gray-700">Nom d'utilisateur</label>
-              <p className="text-base text-gray-900 mt-1">{user.username}</p>
+          {!isEditingUsername ? (
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex-1">
+                <label className="block text-sm font-semibold text-gray-700">Nom d'utilisateur</label>
+                <p className="text-base text-gray-900 mt-1">{user.username}</p>
+              </div>
+              <button
+                onClick={() => setIsEditingUsername(true)}
+                className="p-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
+                title="Modifier le nom d'utilisateur"
+              >
+                <Edit2 size={20} color="#2563EB" variant="Bold" />
+              </button>
             </div>
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <UserTag size={20} color="#2563EB" variant="Bold" />
-            </div>
-          </div>
+          ) : (
+            <form onSubmit={handleUsernameChange} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Nouveau nom d'utilisateur
+              </label>
+              <input
+                type="text"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                required
+                minLength={3}
+                maxLength={30}
+                pattern="^[a-zA-Z0-9_-]+$"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Entrez votre nouveau nom d'utilisateur"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                3-30 caractères, lettres, chiffres, tirets et underscores uniquement
+              </p>
+              <div className="flex gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingUsername(false);
+                    setNewUsername(user.username);
+                  }}
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || updatingUser}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg"
+                >
+                  {isSubmitting || updatingUser ? (
+                    <>
+                      <SpinLoader />
+                      <span>Enregistrement...</span>
+                    </>
+                  ) : (
+                    <>
+                      <TickCircle size={18} color="white" variant="Bold" />
+                      <span>Enregistrer</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 
