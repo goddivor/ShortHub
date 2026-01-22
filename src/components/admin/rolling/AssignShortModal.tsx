@@ -2,8 +2,10 @@ import { useState, useMemo } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
 import {
   ASSIGN_SHORT_MUTATION,
+  REJECT_SHORT_MUTATION,
   GET_USERS_QUERY,
   GET_ADMIN_CHANNELS_QUERY,
+  GET_SHORTS_STATS_QUERY,
 } from '@/lib/graphql';
 import { Short, UserRole, AdminChannel, ContentType, User as UserType } from '@/types/graphql';
 import { useToast } from '@/context/toast-context';
@@ -48,22 +50,47 @@ export default function AssignShortModal({ isOpen, onClose, short, onAssigned }:
   }, [channelsData, short]);
 
   const [assignShort, { loading: assignLoading }] = useMutation(ASSIGN_SHORT_MUTATION, {
+    refetchQueries: [{ query: GET_SHORTS_STATS_QUERY }],
     onCompleted: () => {
       toast.success('Short assigné avec succès !');
       onAssigned();
-      handleClose();
+      resetAndClose();
     },
     onError: (error) => {
       toast.error(error.message);
     },
   });
 
-  const handleClose = () => {
+  const [rejectShort, { loading: rejectLoading }] = useMutation(REJECT_SHORT_MUTATION, {
+    refetchQueries: [{ query: GET_SHORTS_STATS_QUERY }],
+    onCompleted: () => {
+      toast.info('Short ignoré');
+      resetAndClose();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const resetAndClose = () => {
     setSelectedVideaste('');
     setSelectedChannel('');
     setDeadline('');
     setNotes('');
     onClose();
+  };
+
+  const handleClose = () => {
+    // Si un short est présent, on l'ignore automatiquement à la fermeture
+    if (short) {
+      rejectShort({
+        variables: {
+          shortId: short.id,
+        },
+      });
+    } else {
+      resetAndClose();
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -159,7 +186,7 @@ export default function AssignShortModal({ isOpen, onClose, short, onAssigned }:
             </div>
             <button
               onClick={handleClose}
-              disabled={assignLoading}
+              disabled={assignLoading || rejectLoading}
               className="p-2 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
             >
               <CloseCircle size={24} color="white" variant="Bold" />
@@ -302,15 +329,22 @@ export default function AssignShortModal({ isOpen, onClose, short, onAssigned }:
             <button
               type="button"
               onClick={handleClose}
-              className="flex-1 px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors disabled:opacity-50"
-              disabled={assignLoading}
+              className="flex-1 px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              disabled={assignLoading || rejectLoading}
             >
-              Annuler
+              {rejectLoading ? (
+                <>
+                  <SpinLoader />
+                  <span>Annulation...</span>
+                </>
+              ) : (
+                <span>Annuler</span>
+              )}
             </button>
             <button
               type="submit"
               className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg"
-              disabled={assignLoading || loading || videasts.length === 0 || matchingChannels.length === 0}
+              disabled={assignLoading || rejectLoading || loading || videasts.length === 0 || matchingChannels.length === 0}
             >
               {assignLoading ? (
                 <>

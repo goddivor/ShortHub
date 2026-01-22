@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation } from '@apollo/client/react';
-import { ROLL_SHORT_MUTATION, REJECT_SHORT_MUTATION, RETAIN_SHORT_MUTATION } from '@/lib/graphql';
+import { ROLL_SHORT_MUTATION, REJECT_SHORT_MUTATION, RETAIN_SHORT_MUTATION, GET_SHORTS_STATS_QUERY } from '@/lib/graphql';
 import { SourceChannel, Short } from '@/types/graphql';
 import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
@@ -18,6 +18,7 @@ export default function RollShortModal({ isOpen, onClose, channel, onShortRetain
   const toast = useToast();
 
   const [rollShort, { loading: rollingLoading }] = useMutation<{ rollShort: Short }>(ROLL_SHORT_MUTATION, {
+    refetchQueries: [{ query: GET_SHORTS_STATS_QUERY }],
     onCompleted: (data) => {
       setRolledShort(data.rollShort);
       toast.success('Short généré avec succès !');
@@ -28,9 +29,11 @@ export default function RollShortModal({ isOpen, onClose, channel, onShortRetain
   });
 
   const [rejectShort, { loading: rejectLoading }] = useMutation(REJECT_SHORT_MUTATION, {
+    refetchQueries: [{ query: GET_SHORTS_STATS_QUERY }],
     onCompleted: () => {
       toast.info('Short ignoré');
-      handleClose();
+      setRolledShort(null);
+      onClose();
     },
     onError: (error) => {
       toast.error(error.message);
@@ -38,10 +41,12 @@ export default function RollShortModal({ isOpen, onClose, channel, onShortRetain
   });
 
   const [retainShort, { loading: retainLoading }] = useMutation<{ retainShort: Short }>(RETAIN_SHORT_MUTATION, {
+    refetchQueries: [{ query: GET_SHORTS_STATS_QUERY }],
     onCompleted: (data) => {
       toast.success('Short retenu avec succès !');
       onShortRetained(data.retainShort);
-      handleClose();
+      setRolledShort(null);
+      onClose();
     },
     onError: (error) => {
       toast.error(error.message);
@@ -62,17 +67,16 @@ export default function RollShortModal({ isOpen, onClose, channel, onShortRetain
   }, [isOpen, channel, rollShort]);
 
   const handleClose = () => {
-    setRolledShort(null);
-    onClose();
-  };
-
-  const handleIgnore = () => {
-    if (!rolledShort) return;
-    rejectShort({
-      variables: {
-        shortId: rolledShort.id,
-      },
-    });
+    // Si un short a été généré, on l'ignore automatiquement à la fermeture
+    if (rolledShort) {
+      rejectShort({
+        variables: {
+          shortId: rolledShort.id,
+        },
+      });
+    } else {
+      onClose();
+    }
   };
 
   const handleRetain = () => {
@@ -186,7 +190,7 @@ export default function RollShortModal({ isOpen, onClose, channel, onShortRetain
               {/* Actions */}
               <div className="flex gap-3 pt-4">
                 <button
-                  onClick={handleIgnore}
+                  onClick={handleClose}
                   disabled={rejectLoading || retainLoading}
                   className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
