@@ -16,6 +16,12 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import VideoUploadModal from './VideoUploadModal';
 import SpinLoader from '../SpinLoader';
+import {
+  ImageSearchButtons,
+  ImageCropSelector,
+  ImageSearchResultsModal,
+} from '@/components/image-search';
+import { useImageSearch } from '@/hooks/useImageSearch';
 
 interface ShortDetailsModalProps {
   isOpen: boolean;
@@ -35,6 +41,7 @@ const ShortDetailsModal: React.FC<ShortDetailsModalProps> = ({
   loading = false
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const imageSearch = useImageSearch();
 
   if (!isOpen || !short) return null;
 
@@ -102,6 +109,16 @@ const ShortDetailsModal: React.FC<ShortDetailsModalProps> = ({
               className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
+            />
+          </div>
+
+          {/* Image Search */}
+          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <ImageSearchButtons
+              onStartCapture={imageSearch.startCapture}
+              isSearching={imageSearch.isSearching}
+              isSelecting={imageSearch.isSelecting}
+              isCapturing={imageSearch.isCapturing}
             />
           </div>
 
@@ -279,6 +296,27 @@ const ShortDetailsModal: React.FC<ShortDetailsModalProps> = ({
           />
         )}
       </div>
+
+      {/* Image Crop Selector */}
+      {imageSearch.screenshotImage && (
+        <ImageCropSelector
+          imageUrl={imageSearch.screenshotImage}
+          onCropComplete={imageSearch.performSearch}
+          onCancel={imageSearch.cancelSelection}
+          isActive={imageSearch.isSelecting}
+        />
+      )}
+
+      {/* Image Search Results Modal */}
+      <ImageSearchResultsModal
+        isOpen={!!imageSearch.results || imageSearch.isSearching || !!imageSearch.error}
+        results={imageSearch.results}
+        provider={imageSearch.provider}
+        capturedImage={imageSearch.capturedImage}
+        isSearching={imageSearch.isSearching}
+        error={imageSearch.error}
+        onClose={imageSearch.clearResults}
+      />
     </div>
   );
 };
