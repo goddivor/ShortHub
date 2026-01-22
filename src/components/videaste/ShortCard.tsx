@@ -4,7 +4,6 @@ import { Short, ShortStatus } from '@/types/graphql';
 import { getAuthToken } from '@/lib/apollo-client';
 import {
   VideoPlay,
-  Calendar,
   Clock,
   Youtube,
   TickCircle,
@@ -12,7 +11,11 @@ import {
   Eye,
   CloseCircle,
   DocumentUpload,
-  DocumentDownload
+  DocumentDownload,
+  Timer1,
+  Danger,
+  Send2,
+  ArrowRight2
 } from 'iconsax-react';
 import { format, differenceInDays, isPast } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -42,12 +45,10 @@ const ShortCard: React.FC<ShortCardProps> = ({
 
     const url = `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/drive/download/${short.id}`;
 
-    // Créer un lien temporaire pour télécharger
     const link = document.createElement('a');
     link.href = url;
     link.download = short.fileName || 'video.mp4';
 
-    // Ajouter le token dans les headers via fetch puis télécharger
     fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -73,33 +74,58 @@ const ShortCard: React.FC<ShortCardProps> = ({
       case ShortStatus.ASSIGNED:
         return {
           label: 'Assigné',
-          color: 'bg-blue-100 text-blue-800 border-blue-200',
-          icon: <VideoPlay size={14} color="#1E40AF" variant="Bold" />
+          bgColor: 'bg-blue-500',
+          textColor: 'text-white',
+          icon: <VideoPlay size={12} color="white" />
         };
       case ShortStatus.IN_PROGRESS:
         return {
           label: 'En cours',
-          color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-          icon: <Play size={14} color="#B45309" variant="Bold" />
+          bgColor: 'bg-amber-500',
+          textColor: 'text-white',
+          icon: <Play size={12} color="white" />
         };
       case ShortStatus.COMPLETED:
         return {
           label: 'Terminé',
-          color: 'bg-green-100 text-green-800 border-green-200',
-          icon: <TickCircle size={14} color="#15803D" variant="Bold" />
+          bgColor: 'bg-emerald-500',
+          textColor: 'text-white',
+          icon: <TickCircle size={12} color="white" />
+        };
+      case ShortStatus.VALIDATED:
+        return {
+          label: 'Validé',
+          bgColor: 'bg-green-600',
+          textColor: 'text-white',
+          icon: <TickCircle size={12} color="white" />
+        };
+      case ShortStatus.PUBLISHED:
+        return {
+          label: 'Publié',
+          bgColor: 'bg-purple-600',
+          textColor: 'text-white',
+          icon: <Send2 size={12} color="white" />
+        };
+      case ShortStatus.REJECTED:
+        return {
+          label: 'Rejeté',
+          bgColor: 'bg-red-500',
+          textColor: 'text-white',
+          icon: <CloseCircle size={12} color="white" />
         };
       default:
         return {
           label: status,
-          color: 'bg-gray-100 text-gray-800 border-gray-200',
-          icon: <VideoPlay size={14} color="#374151" variant="Bold" />
+          bgColor: 'bg-gray-500',
+          textColor: 'text-white',
+          icon: <VideoPlay size={12} color="white" />
         };
     }
   };
 
   const statusConfig = getStatusConfig(short.status);
 
-  // Statuts où le travail est terminé (pas besoin d'afficher deadline)
+  // Statuts où le travail est terminé
   const completedStatuses = [ShortStatus.COMPLETED, ShortStatus.VALIDATED, ShortStatus.PUBLISHED];
   const isCompleted = completedStatuses.includes(short.status);
 
@@ -110,163 +136,165 @@ const ShortCard: React.FC<ShortCardProps> = ({
 
   const isLate = short.deadline && !isCompleted ? isPast(new Date(short.deadline)) : false;
 
-  const getDeadlineColor = () => {
-    if (isLate) return 'text-red-600 bg-red-50';
-    if (daysUntilDeadline !== null && daysUntilDeadline <= 2) return 'text-orange-600 bg-orange-50';
-    return 'text-gray-600 bg-gray-50';
+  // Déterminer l'action principale
+  const getPrimaryAction = () => {
+    if (short.status === ShortStatus.ASSIGNED && onStart) {
+      return {
+        label: 'Démarrer',
+        icon: <Play size={16} color="white" />,
+        onClick: () => onStart(short),
+        className: 'bg-blue-600 hover:bg-blue-700 text-white'
+      };
+    }
+    if (short.status === ShortStatus.IN_PROGRESS) {
+      return {
+        label: 'Upload',
+        icon: <DocumentUpload size={16} color="white" />,
+        onClick: () => setIsUploadModalOpen(true),
+        className: 'bg-emerald-600 hover:bg-emerald-700 text-white'
+      };
+    }
+    if (short.status === ShortStatus.REJECTED) {
+      return {
+        label: 'Re-upload',
+        icon: <DocumentUpload size={16} color="white" />,
+        onClick: () => setIsUploadModalOpen(true),
+        className: 'bg-orange-600 hover:bg-orange-700 text-white'
+      };
+    }
+    if (short.driveFileId && [ShortStatus.COMPLETED, ShortStatus.VALIDATED, ShortStatus.PUBLISHED].includes(short.status)) {
+      return {
+        label: 'Télécharger',
+        icon: <DocumentDownload size={16} color="white" />,
+        onClick: handleDownload,
+        className: 'bg-purple-600 hover:bg-purple-700 text-white'
+      };
+    }
+    return null;
   };
 
+  const primaryAction = getPrimaryAction();
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden group">
-      {/* Header avec statut et deadline */}
-      <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-2">
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${statusConfig.color}`}>
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 group">
+      {/* Thumbnail Section */}
+      <div className="relative">
+        <div className="aspect-video bg-gray-900 overflow-hidden">
+          <img
+            src={`https://img.youtube.com/vi/${short.videoId}/maxresdefault.jpg`}
+            alt={short.title || 'Short thumbnail'}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${short.videoId}/mqdefault.jpg`;
+            }}
+          />
+          {/* Overlay gradient */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        </div>
+
+        {/* Status Badge */}
+        <div className="absolute top-3 left-3">
+          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${statusConfig.bgColor} ${statusConfig.textColor} shadow-lg`}>
             {statusConfig.icon}
             {statusConfig.label}
           </span>
-
-          {isLate && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
-              <CloseCircle size={14} color="#B91C1C" variant="Bold" />
-              En retard
-            </span>
-          )}
         </div>
 
-        {/* Afficher la deadline seulement si le short n'est pas terminé */}
-        {short.deadline && !isCompleted && (
-          <div className={`flex items-center gap-2 text-xs font-medium px-2 py-1.5 rounded-lg ${getDeadlineColor()}`}>
-            <Calendar size={14} variant="Bold" />
-            <span>
-              Deadline: {format(new Date(short.deadline), 'dd MMM yyyy à HH:mm', { locale: fr })}
-              {daysUntilDeadline !== null && !isLate && (
-                <span className="ml-1">
-                  ({daysUntilDeadline === 0 ? "Aujourd'hui" : `${daysUntilDeadline}j restants`})
-                </span>
-              )}
+        {/* Late Badge */}
+        {isLate && (
+          <div className="absolute top-3 right-3">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-600 text-white shadow-lg">
+              <Danger size={12} color="white" />
+              En retard
             </span>
+          </div>
+        )}
+
+        {/* Deadline Banner */}
+        {short.deadline && !isCompleted && (
+          <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-black/70 backdrop-blur-sm">
+            <div className={`flex items-center gap-2 text-xs font-medium ${isLate ? 'text-red-400' : daysUntilDeadline !== null && daysUntilDeadline <= 2 ? 'text-amber-400' : 'text-gray-300'}`}>
+              <Timer1 size={14} color="currentColor" />
+              <span>
+                {isLate
+                  ? `Deadline dépassée (${format(new Date(short.deadline), 'dd MMM', { locale: fr })})`
+                  : daysUntilDeadline === 0
+                    ? "Deadline aujourd'hui"
+                    : `${daysUntilDeadline}j restants`
+                }
+              </span>
+            </div>
           </div>
         )}
       </div>
 
       {/* Content */}
       <div className="p-4">
-        {/* Thumbnail & Video Info */}
-        <div className="flex gap-4 mb-4">
-          <div className="w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 relative group/thumbnail">
-            <img
-              src={`https://img.youtube.com/vi/${short.videoId}/mqdefault.jpg`}
-              alt={short.title || 'Short thumbnail'}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumbnail:opacity-100 transition-opacity flex items-center justify-center">
-              <Youtube size={32} color="white" variant="Bold" />
-            </div>
+        {/* Title */}
+        <h3 className="font-semibold text-gray-900 line-clamp-2 mb-3 leading-tight">
+          {short.title || 'Titre non disponible'}
+        </h3>
+
+        {/* Channels */}
+        <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+            <VideoPlay size={14} color="#6B7280" />
+            <span className="truncate max-w-[100px]">{short.sourceChannel.channelName}</span>
           </div>
-
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-              {short.title || 'Titre non disponible'}
-            </h3>
-
-            {short.description && (
-              <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-                {short.description}
-              </p>
-            )}
-
-            {/* Channel Info */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 text-xs">
-                <VideoPlay size={14} color="#6B7280" variant="Bold" />
-                <span className="text-gray-600 font-medium">Source:</span>
-                <span className="text-gray-900">{short.sourceChannel.channelName}</span>
+          {short.targetChannel && (
+            <>
+              <ArrowRight2 size={12} color="#9CA3AF" />
+              <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                <Youtube size={14} color="#EF4444" />
+                <span className="truncate max-w-[100px]">{short.targetChannel.channelName}</span>
               </div>
-
-              {short.targetChannel && (
-                <div className="flex items-center gap-2 text-xs">
-                  <Youtube size={14} color="#6B7280" variant="Bold" />
-                  <span className="text-gray-600 font-medium">Publication:</span>
-                  <span className="text-gray-900">{short.targetChannel.channelName}</span>
-                </div>
-              )}
-            </div>
-          </div>
+            </>
+          )}
         </div>
 
-        {/* Notes */}
+        {/* Notes (condensed) */}
         {short.notes && (
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-xs font-semibold text-blue-900 mb-1">Notes de l'admin:</p>
-            <p className="text-sm text-blue-800">{short.notes}</p>
+          <div className="mb-3 p-2.5 bg-blue-50 rounded-lg border border-blue-100">
+            <p className="text-xs text-blue-700 line-clamp-2">
+              <span className="font-medium">Note: </span>
+              {short.notes}
+            </p>
           </div>
         )}
 
-        {/* Admin Feedback (for completed shorts) */}
+        {/* Admin Feedback */}
         {short.adminFeedback && (
-          <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
-            <p className="text-xs font-semibold text-green-900 mb-1">Feedback de l'admin:</p>
-            <p className="text-sm text-green-800">{short.adminFeedback}</p>
+          <div className="mb-3 p-2.5 bg-amber-50 rounded-lg border border-amber-100">
+            <p className="text-xs text-amber-700 line-clamp-2">
+              <span className="font-medium">Feedback: </span>
+              {short.adminFeedback}
+            </p>
           </div>
         )}
 
-        {/* Meta info */}
-        <div className="flex items-center gap-4 mb-4 text-xs text-gray-500">
-          <div className="flex items-center gap-1">
-            <Clock size={12} color="#6B7280" />
-            <span>Assigné le {format(new Date(short.assignedAt || short.createdAt), 'dd MMM yyyy', { locale: fr })}</span>
-          </div>
+        {/* Meta */}
+        <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
+          <Clock size={12} color="#9CA3AF" />
+          <span>Assigné le {format(new Date(short.assignedAt || short.createdAt), 'dd MMM yyyy', { locale: fr })}</span>
         </div>
 
-        {/* Action Buttons */}
+        {/* Actions */}
         <div className="flex gap-2">
           <button
             onClick={() => onViewDetails(short)}
-            className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="flex-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5"
           >
-            <Eye size={18} color="#374151" variant="Bold" />
-            <span>Voir détails</span>
+            <Eye size={16} color="#374151" />
+            Détails
           </button>
 
-          {short.status === ShortStatus.ASSIGNED && onStart && (
+          {primaryAction && (
             <button
-              onClick={() => onStart(short)}
-              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-md"
+              onClick={primaryAction.onClick}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${primaryAction.className}`}
             >
-              <Play size={18} color="white" variant="Bold" />
-              <span>Démarrer</span>
-            </button>
-          )}
-
-          {short.status === ShortStatus.IN_PROGRESS && (
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-md"
-            >
-              <DocumentUpload size={18} color="white" variant="Bold" />
-              <span>Upload vidéo</span>
-            </button>
-          )}
-
-          {short.status === ShortStatus.REJECTED && (
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-md"
-            >
-              <DocumentUpload size={18} color="white" variant="Bold" />
-              <span>Re-uploader</span>
-            </button>
-          )}
-
-          {/* Bouton télécharger pour les shorts avec fichier uploadé */}
-          {short.driveFileId && [ShortStatus.COMPLETED, ShortStatus.VALIDATED, ShortStatus.PUBLISHED, ShortStatus.REJECTED].includes(short.status) && (
-            <button
-              onClick={handleDownload}
-              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-md"
-            >
-              <DocumentDownload size={18} color="white" variant="Bold" />
-              <span>Télécharger</span>
+              {primaryAction.icon}
+              {primaryAction.label}
             </button>
           )}
         </div>
