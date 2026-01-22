@@ -78,25 +78,15 @@ const AssistantDashboardPage: React.FC = () => {
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-cyan-600 to-teal-700 rounded-xl p-8 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <People size={32} color="white" variant="Bold" />
-              <h1 className="text-3xl font-bold">Bienvenue, {user?.username}</h1>
-            </div>
-            <p className="text-cyan-100 text-lg">
-              Assistant vidéaste - Gérez vos tâches et collaborez efficacement
-            </p>
-          </div>
-          <div className="hidden md:block">
-            <Video size={64} color="white" className="opacity-20" variant="Bold" />
-          </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-6 py-4">
+          <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
         </div>
       </div>
 
+      <div className="p-6 space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statsCards.map((stat, index) => (
@@ -286,6 +276,7 @@ const AssistantDashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
