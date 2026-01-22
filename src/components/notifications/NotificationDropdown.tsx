@@ -10,7 +10,7 @@ import {
 import { Notification as NotificationType } from '@/types/graphql';
 import NotificationItem from './NotificationItem';
 import SpinLoader from '@/components/SpinLoader';
-import { Notification, Refresh, TickCircle } from 'iconsax-react';
+import { Notification, Refresh, TickCircle, CloseCircle } from 'iconsax-react';
 
 interface NotificationDropdownProps {
   isOpen: boolean;
@@ -39,7 +39,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   // Fetch unread count
   const { data: countData } = useQuery<{ unreadNotificationsCount: number }>(GET_UNREAD_NOTIFICATIONS_COUNT_QUERY, {
     skip: !isOpen,
-    pollInterval: 30000, // Rafraîchir toutes les 30 secondes
+    pollInterval: 30000,
   });
 
   // Mark as read mutation
@@ -83,66 +83,71 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
     <>
       {/* Overlay */}
       <div
-        className="fixed inset-0 z-40"
+        className="fixed inset-0 z-[9998] bg-black/20"
         onClick={onClose}
       />
 
-      {/* Dropdown */}
-      <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[600px] flex flex-col">
+      {/* Dropdown - positioned to the right of the sidebar */}
+      <div className="fixed left-64 top-4 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 z-[9999] max-h-[calc(100vh-32px)] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-3">
+        <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Notification size={20} color="#374151" variant="Bold" />
-              <h3 className="text-lg font-semibold text-gray-900">
+              <Notification size={18} color="#FFFFFF" variant="Bold" />
+              <h3 className="text-base font-semibold text-white">
                 Notifications
               </h3>
               {unreadCount > 0 && (
-                <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full font-semibold">
+                <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded-full font-bold">
                   {unreadCount}
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Refresh Button */}
+            <div className="flex items-center gap-1">
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
                 title="Actualiser"
               >
                 <Refresh
-                  size={18}
-                  color="#6B7280"
+                  size={16}
+                  color="#FFFFFF"
                   className={loading ? 'animate-spin' : ''}
                 />
               </button>
 
-              {/* Mark all as read */}
               {unreadCount > 0 && (
                 <button
                   onClick={handleMarkAllAsRead}
                   disabled={markingAll}
-                  className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
                   title="Tout marquer comme lu"
                 >
-                  <TickCircle size={18} color="#10B981" variant="Bold" />
+                  <TickCircle size={16} color="#10B981" variant="Bold" />
                 </button>
               )}
+
+              <button
+                onClick={onClose}
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                title="Fermer"
+              >
+                <CloseCircle size={16} color="#FFFFFF" />
+              </button>
             </div>
           </div>
 
           {/* Filter Toggle */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mt-3">
             <button
               onClick={() => setShowUnreadOnly(false)}
               className={`
-                px-3 py-1.5 text-sm rounded-lg transition-colors
-                ${
-                  !showUnreadOnly
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                px-3 py-1 text-xs font-medium rounded-full transition-colors
+                ${!showUnreadOnly
+                  ? 'bg-white text-gray-900'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'
                 }
               `}
             >
@@ -151,11 +156,10 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
             <button
               onClick={() => setShowUnreadOnly(true)}
               className={`
-                px-3 py-1.5 text-sm rounded-lg transition-colors
-                ${
-                  showUnreadOnly
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                px-3 py-1 text-xs font-medium rounded-full transition-colors
+                ${showUnreadOnly
+                  ? 'bg-white text-gray-900'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'
                 }
               `}
             >
@@ -171,9 +175,9 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
               <SpinLoader />
             </div>
           ) : notifications.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <Notification size={32} color="#9CA3AF" variant="Bulk" />
+            <div className="text-center py-12 px-4">
+              <div className="bg-gray-100 rounded-full w-14 h-14 flex items-center justify-center mx-auto mb-3">
+                <Notification size={28} color="#9CA3AF" variant="Bulk" />
               </div>
               <p className="text-gray-500 text-sm">
                 {showUnreadOnly
@@ -182,31 +186,20 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
               </p>
             </div>
           ) : (
-            notifications.map((notification) => (
-              <NotificationItem
-                key={notification.id}
-                notification={notification}
-                onMarkAsRead={handleMarkAsRead}
-                onClick={() => {
-                  // TODO: Navigate to related short if applicable
-                  onClose();
-                }}
-              />
-            ))
+            <div className="divide-y divide-gray-100">
+              {notifications.map((notification) => (
+                <NotificationItem
+                  key={notification.id}
+                  notification={notification}
+                  onMarkAsRead={handleMarkAsRead}
+                  onClick={() => {
+                    onClose();
+                  }}
+                />
+              ))}
+            </div>
           )}
         </div>
-
-        {/* Footer */}
-        {notifications.length > 0 && (
-          <div className="p-3 border-t border-gray-200 text-center">
-            <button
-              onClick={onClose}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Fermer
-            </button>
-          </div>
-        )}
       </div>
     </>
   );
