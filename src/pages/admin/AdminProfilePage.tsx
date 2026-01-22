@@ -1,33 +1,42 @@
 // src/pages/admin/AdminProfilePage.tsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useMutation } from '@apollo/client/react';
 import { type FetchResult } from '@apollo/client';
-import { UPLOAD_PROFILE_IMAGE_MUTATION, REMOVE_PROFILE_IMAGE_MUTATION, UPDATE_USER_MUTATION, CHANGE_PASSWORD_MUTATION } from '@/lib/graphql';
+import {
+  UPLOAD_PROFILE_IMAGE_MUTATION,
+  REMOVE_PROFILE_IMAGE_MUTATION,
+  UPDATE_USER_MUTATION,
+  CHANGE_PASSWORD_MUTATION
+} from '@/lib/graphql';
 import { useToast } from '@/context/toast-context';
 import SpinLoader from '@/components/SpinLoader';
 import {
-  UserTag,
+  User,
+  Call,
+  Sms,
+  Shield,
+  Calendar,
   Lock,
   Eye,
   EyeSlash,
   TickCircle,
   Edit2,
-  Sms,
+  Notification,
   Whatsapp,
-  Shield,
+  Mobile,
   Camera,
   Trash,
-  Notification,
-  Mobile,
   Verify,
   CloseCircle
 } from 'iconsax-react';
 
+type TabType = 'overview' | 'security' | 'notifications';
+
 const AdminProfilePage: React.FC = () => {
   const { user, refetchUser } = useAuth();
   const { success, error } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   // Username editing state
   const [isEditingUsername, setIsEditingUsername] = useState(false);
@@ -50,14 +59,24 @@ const AdminProfilePage: React.FC = () => {
   const [emailNotifications, setEmailNotifications] = useState(user?.emailNotifications || false);
   const [whatsappNotifications, setWhatsappNotifications] = useState(user?.whatsappNotifications || false);
 
+  // Mutations
   const [uploadProfileImage, { loading: uploadingImage }] = useMutation(UPLOAD_PROFILE_IMAGE_MUTATION, {
     onCompleted: async () => {
       await refetchUser();
+      success('Image uploadée', 'Votre image de profil a été mise à jour');
+    },
+    onError: (err) => {
+      error('Erreur', err.message || 'Impossible d\'uploader l\'image');
     }
   });
+
   const [removeProfileImage, { loading: removingImage }] = useMutation(REMOVE_PROFILE_IMAGE_MUTATION, {
     onCompleted: async () => {
       await refetchUser();
+      success('Image supprimée', 'Votre image de profil a été supprimée');
+    },
+    onError: (err) => {
+      error('Erreur', err.message || 'Impossible de supprimer l\'image');
     }
   });
 
@@ -72,14 +91,29 @@ const AdminProfilePage: React.FC = () => {
 
   const [changePassword] = useMutation<{ changePassword: boolean }>(CHANGE_PASSWORD_MUTATION);
 
+  // Handlers
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      uploadProfileImage({ variables: { base64Image: base64 } });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleImageRemove = async () => {
+    await removeProfileImage();
+  };
+
   const handleUsernameChange = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (newUsername.length < 3) {
       error('Erreur', 'Le nom d\'utilisateur doit contenir au moins 3 caractères');
       return;
     }
-
     if (newUsername === user?.username) {
       setIsEditingUsername(false);
       return;
@@ -88,70 +122,23 @@ const AdminProfilePage: React.FC = () => {
     setIsSubmitting(true);
     try {
       await updateUser({
-        variables: {
-          id: user?.id,
-          input: { username: newUsername }
-        }
+        variables: { id: user?.id, input: { username: newUsername } }
       });
-      success('Nom d\'utilisateur modifié', 'Votre nom d\'utilisateur a été mis à jour avec succès');
+      success('Nom d\'utilisateur modifié', 'Votre nom d\'utilisateur a été mis à jour');
       setIsEditingUsername(false);
     } catch {
-      // Error handled in mutation onError
+      // Error handled in mutation
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      error('Erreur', 'Veuillez sélectionner une image valide');
-      return;
-    }
-
-    try {
-      // Convert to base64
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
-
-        try {
-          await uploadProfileImage({
-            variables: { base64Image: base64String }
-          });
-
-          success('Image uploadée', 'Votre image de profil a été mise à jour avec succès');
-        } catch (err) {
-          error('Erreur', err instanceof Error ? err.message : 'Impossible d\'uploader l\'image');
-        }
-      };
-
-      reader.readAsDataURL(file);
-    } catch {
-      error('Erreur', 'Erreur lors de la lecture du fichier');
-    }
-  };
-
-  const handleRemoveImage = async () => {
-    try {
-      await removeProfileImage();
-      success('Image supprimée', 'Votre image de profil a été supprimée');
-    } catch (err) {
-      error('Erreur', err instanceof Error ? err.message : 'Impossible de supprimer l\'image');
-    }
-  };
-
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (newPassword !== confirmPassword) {
       error('Erreur', 'Les mots de passe ne correspondent pas');
       return;
     }
-
     if (newPassword.length < 6) {
       error('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
       return;
@@ -160,47 +147,32 @@ const AdminProfilePage: React.FC = () => {
     setIsSubmitting(true);
     try {
       const result: FetchResult<{ changePassword: boolean }> = await changePassword({
-        variables: {
-          oldPassword,
-          newPassword
-        }
+        variables: { oldPassword, newPassword }
       });
 
-      const { data, errors: apolloErrors } = result;
-
-      // Vérifier s'il y a des erreurs GraphQL
-      if (apolloErrors && apolloErrors.length > 0) {
-        error('Erreur', apolloErrors[0].message || 'Erreur lors de la modification du mot de passe');
+      if (result.errors?.length) {
+        error('Erreur', result.errors[0].message);
         return;
       }
 
-      if (!data) {
-        error('Erreur', 'Aucune donnée retournée');
-        return;
-      }
-
-      // Reset form
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setIsEditingPassword(false);
       success('Mot de passe modifié', 'Votre mot de passe a été modifié avec succès');
     } catch (err) {
-      error('Erreur', err instanceof Error ? err.message : 'Erreur lors de la modification du mot de passe');
+      error('Erreur', err instanceof Error ? err.message : 'Erreur lors de la modification');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleNotificationSettingsSave = async (e: React.FormEvent) => {
+  const handleNotificationsSave = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Validation
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       error('Erreur', 'Veuillez entrer une adresse email valide');
       return;
     }
-
     if (phone && !/^[+]?[\d\s()-]+$/.test(phone)) {
       error('Erreur', 'Veuillez entrer un numéro de téléphone valide');
       return;
@@ -213,21 +185,21 @@ const AdminProfilePage: React.FC = () => {
           input: {
             email: email || null,
             phone: phone || null,
-            whatsappLinked: !!phone, // Automatiquement lié si numéro fourni
+            whatsappLinked: !!phone,
             emailNotifications,
             whatsappNotifications,
           }
         }
       });
-      success('Paramètres mis à jour', 'Vos paramètres de notifications ont été mis à jour avec succès');
+      success('Paramètres mis à jour', 'Vos paramètres de notifications ont été mis à jour');
       setIsEditingNotifications(false);
     } catch {
-      // Error handled in mutation onError
+      // Error handled in mutation
     }
   };
 
-  // Update state when user changes
-  React.useEffect(() => {
+  // Sync state with user
+  useEffect(() => {
     if (user) {
       setNewUsername(user.username || '');
       setEmail(user.email || '');
@@ -245,547 +217,531 @@ const AdminProfilePage: React.FC = () => {
     );
   }
 
+  const tabs = [
+    { id: 'overview' as const, label: 'Aperçu' },
+    { id: 'security' as const, label: 'Sécurité' },
+    { id: 'notifications' as const, label: 'Notifications' },
+  ];
+
   return (
-    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 text-white shadow-xl">
-        <div className="flex items-center gap-6">
-          {/* Profile Image */}
-          <div className="relative group">
-            <div className="w-24 h-24 rounded-full overflow-hidden bg-white/20 backdrop-blur-sm border-4 border-white/30">
-              {user.profileImage ? (
-                <img
-                  src={user.profileImage}
-                  alt={user.username}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <UserTag size={48} color="white" variant="Bold" />
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-6 py-4">
+          <h1 className="text-2xl font-bold text-gray-900">Profil</h1>
+        </div>
+        {/* Tabs */}
+        <div className="px-6 flex gap-6 border-t border-gray-100">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-gray-900 text-gray-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-6">
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Left Column - User Info */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Profile Card */}
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-start gap-4">
+                  {/* Avatar */}
+                  <div className="relative group">
+                    {user.profileImage ? (
+                      <img
+                        src={user.profileImage}
+                        alt={user.username}
+                        className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center border-2 border-gray-200">
+                        <span className="text-2xl font-bold text-white">
+                          {user.username?.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    {/* Upload overlay */}
+                    <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                      <label className="cursor-pointer p-1.5 hover:bg-white/20 rounded-full transition-colors">
+                        <Camera size={16} color="white" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          disabled={uploadingImage}
+                        />
+                      </label>
+                      {user.profileImage && (
+                        <button
+                          onClick={handleImageRemove}
+                          disabled={removingImage}
+                          className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
+                        >
+                          <Trash size={16} color="white" />
+                        </button>
+                      )}
+                    </div>
+                    {(uploadingImage || removingImage) && (
+                      <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
+                        <SpinLoader />
+                      </div>
+                    )}
+                  </div>
+                  {/* Name & ID */}
+                  <div className="flex-1">
+                    {isEditingUsername ? (
+                      <form onSubmit={handleUsernameChange} className="space-y-2">
+                        <input
+                          type="text"
+                          value={newUsername}
+                          onChange={(e) => setNewUsername(e.target.value)}
+                          className="w-full px-3 py-1.5 text-lg font-semibold border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setIsEditingUsername(false); setNewUsername(user.username || ''); }}
+                            className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                          >
+                            Annuler
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isSubmitting || updatingUser}
+                            className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                          >
+                            Sauvegarder
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-xl font-semibold text-gray-900">{user.username}</h2>
+                          <button
+                            onClick={() => setIsEditingUsername(true)}
+                            className="p-1 hover:bg-gray-100 rounded transition-colors"
+                          >
+                            <Edit2 size={14} color="#6B7280" />
+                          </button>
+                        </div>
+                        <p className="text-sm text-gray-500">#{user.id.slice(-8).toUpperCase()}</p>
+                      </>
+                    )}
+                  </div>
                 </div>
+              </div>
+
+              {/* About Section */}
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">À propos</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Call size={18} color="#6B7280" />
+                    <div>
+                      <span className="text-sm text-gray-500">Téléphone:</span>
+                      <span className="text-sm text-gray-900 ml-2">{user.phone || 'Non renseigné'}</span>
+                    </div>
+                    {user.phone ? <Verify size={16} color="#10B981" /> : null}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Sms size={18} color="#6B7280" />
+                    <div>
+                      <span className="text-sm text-gray-500">Email:</span>
+                      <span className="text-sm text-gray-900 ml-2">{user.email || 'Non renseigné'}</span>
+                    </div>
+                    {user.email ? <Verify size={16} color="#10B981" /> : null}
+                  </div>
+                </div>
+              </div>
+
+              {/* Account Details */}
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Détails du compte</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Shield size={18} color="#6B7280" />
+                    <div>
+                      <span className="text-sm text-gray-500">Rôle:</span>
+                      <span className="text-sm font-medium text-red-600 ml-2">{user.role}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Calendar size={18} color="#6B7280" />
+                    <div>
+                      <span className="text-sm text-gray-500">Membre depuis:</span>
+                      <span className="text-sm text-gray-900 ml-2">
+                        {new Date(user.createdAt).toLocaleDateString('fr-FR', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <User size={18} color="#6B7280" />
+                    <div>
+                      <span className="text-sm text-gray-500">Statut:</span>
+                      <span className={`text-sm font-medium ml-2 ${user.status === 'ACTIVE' ? 'text-green-600' : 'text-red-600'}`}>
+                        {user.status === 'ACTIVE' ? 'Actif' : 'Bloqué'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Activity & Stats */}
+            <div className="lg:col-span-3 space-y-6">
+              {/* Notifications Summary */}
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-900">Paramètres de notification</h3>
+                  <button
+                    onClick={() => setActiveTab('notifications')}
+                    className="text-sm text-red-600 hover:text-red-700 font-medium"
+                  >
+                    Modifier
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className={`p-2 rounded-lg ${emailNotifications ? 'bg-blue-100' : 'bg-gray-200'}`}>
+                      <Sms size={20} color={emailNotifications ? '#3B82F6' : '#9CA3AF'} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Notifications Email</p>
+                      <p className="text-xs text-gray-500">{emailNotifications ? 'Activées' : 'Désactivées'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className={`p-2 rounded-lg ${whatsappNotifications ? 'bg-green-100' : 'bg-gray-200'}`}>
+                      <Whatsapp size={20} color={whatsappNotifications ? '#10B981' : '#9CA3AF'} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Notifications WhatsApp</p>
+                      <p className="text-xs text-gray-500">{whatsappNotifications ? 'Activées' : 'Désactivées'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Security Summary */}
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-900">Sécurité du compte</h3>
+                  <button
+                    onClick={() => setActiveTab('security')}
+                    className="text-sm text-red-600 hover:text-red-700 font-medium"
+                  >
+                    Gérer
+                  </button>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="p-2 bg-amber-100 rounded-lg">
+                    <Lock size={20} color="#D97706" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">Mot de passe</p>
+                    <p className="text-xs text-gray-500">Dernière modification inconnue</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('security')}
+                    className="px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+                  >
+                    Modifier
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Actions rapides</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setActiveTab('security')}
+                    className="flex items-center gap-2 p-3 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <Lock size={18} color="#374151" />
+                    <span className="text-sm text-gray-700">Changer mot de passe</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('notifications')}
+                    className="flex items-center gap-2 p-3 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <Notification size={18} color="#374151" />
+                    <span className="text-sm text-gray-700">Gérer notifications</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'security' && (
+          <div className="max-w-2xl">
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <Lock size={24} color="#D97706" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Modifier le mot de passe</h3>
+                  <p className="text-sm text-gray-500">Assurez-vous d'utiliser un mot de passe fort</p>
+                </div>
+              </div>
+
+              {!isEditingPassword ? (
+                <button
+                  onClick={() => setIsEditingPassword(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  <Edit2 size={18} color="white" />
+                  Modifier mon mot de passe
+                </button>
+              ) : (
+                <form onSubmit={handlePasswordChange} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Mot de passe actuel
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showOldPassword ? 'text' : 'password'}
+                        value={oldPassword}
+                        onChange={(e) => setOldPassword(e.target.value)}
+                        required
+                        className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowOldPassword(!showOldPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2"
+                      >
+                        {showOldPassword ? <EyeSlash size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nouveau mot de passe
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2"
+                      >
+                        {showNewPassword ? <EyeSlash size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Minimum 6 caractères</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Confirmer le mot de passe
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2"
+                      >
+                        {showConfirmPassword ? <EyeSlash size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => { setIsEditingPassword(false); setOldPassword(''); setNewPassword(''); setConfirmPassword(''); }}
+                      className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-gray-700"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting ? <SpinLoader /> : <TickCircle size={18} color="white" />}
+                      Modifier
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
-
-            {/* Upload/Remove overlay */}
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingImage || removingImage}
-                  className="p-2 bg-blue-500 hover:bg-blue-600 rounded-full transition-colors disabled:opacity-50"
-                  title="Changer la photo"
-                >
-                  {uploadingImage ? (
-                    <SpinLoader />
-                  ) : (
-                    <Camera size={20} color="white" variant="Bold" />
-                  )}
-                </button>
-
-                {user.profileImage && (
-                  <button
-                    onClick={handleRemoveImage}
-                    disabled={uploadingImage || removingImage}
-                    className="p-2 bg-red-500 hover:bg-red-600 rounded-full transition-colors disabled:opacity-50"
-                    title="Supprimer la photo"
-                  >
-                    {removingImage ? (
-                      <SpinLoader />
-                    ) : (
-                      <Trash size={20} color="white" variant="Bold" />
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-            />
           </div>
+        )}
 
-          <div>
-            <h1 className="text-3xl font-bold mb-1">Mon Profil</h1>
-            <p className="text-blue-100">Gérez vos informations personnelles</p>
-          </div>
-        </div>
-      </div>
-
-      {/* User Information Card */}
-      <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <UserTag size={20} color="#111827" variant="Bold" />
-            Informations personnelles
-          </h2>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {/* Username */}
-          {!isEditingUsername ? (
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div className="flex-1">
-                <label className="block text-sm font-semibold text-gray-700">Nom d'utilisateur</label>
-                <p className="text-base text-gray-900 mt-1">{user.username}</p>
-              </div>
-              <button
-                onClick={() => setIsEditingUsername(true)}
-                className="p-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
-                title="Modifier le nom d'utilisateur"
-              >
-                <Edit2 size={20} color="#2563EB" variant="Bold" />
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleUsernameChange} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Nouveau nom d'utilisateur
-              </label>
-              <input
-                type="text"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                required
-                minLength={3}
-                maxLength={30}
-                pattern="^[a-zA-Z0-9_-]+$"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Entrez votre nouveau nom d'utilisateur"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                3-30 caractères, lettres, chiffres, tirets et underscores uniquement
-              </p>
-              <div className="flex gap-3 mt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditingUsername(false);
-                    setNewUsername(user.username);
-                  }}
-                  disabled={isSubmitting}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors disabled:opacity-50"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || updatingUser}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg"
-                >
-                  {isSubmitting || updatingUser ? (
-                    <>
-                      <SpinLoader />
-                      <span>Enregistrement...</span>
-                    </>
-                  ) : (
-                    <>
-                      <TickCircle size={18} color="white" variant="Bold" />
-                      <span>Enregistrer</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* Role */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div className="flex-1">
-              <label className="block text-sm font-semibold text-gray-700">Rôle</label>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-semibold">
-                  {user.role}
-                </span>
-              </div>
-            </div>
-            <div className="p-2 bg-red-100 rounded-lg">
-              <Shield size={20} color="#DC2626" variant="Bold" />
-            </div>
-          </div>
-
-          {/* Email */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div className="flex-1">
-              <label className="block text-sm font-semibold text-gray-700">
-                Email {user.email ? '(Connecté)' : '(Non connecté)'}
-              </label>
-              <p className="text-base text-gray-900 mt-1">
-                {user.email || 'Non renseigné'}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Géré depuis vos paramètres de compte
-              </p>
-            </div>
-            <div className={`p-2 rounded-lg ${user.email ? 'bg-green-100' : 'bg-gray-200'}`}>
-              <Sms size={20} color={user.email ? '#059669' : '#6B7280'} variant="Bold" />
-            </div>
-          </div>
-
-          {/* Phone */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div className="flex-1">
-              <label className="block text-sm font-semibold text-gray-700">
-                Téléphone {user.phone ? '(Connecté)' : '(Non connecté)'}
-              </label>
-              <p className="text-base text-gray-900 mt-1">
-                {user.phone || 'Non renseigné'}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Géré depuis vos paramètres de compte
-              </p>
-            </div>
-            <div className={`p-2 rounded-lg ${user.phone ? 'bg-green-100' : 'bg-gray-200'}`}>
-              <Whatsapp size={20} color={user.phone ? '#059669' : '#6B7280'} variant="Bold" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Password Change Card */}
-      <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-amber-50 to-amber-100 px-6 py-4 border-b border-amber-200">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Lock size={20} color="#111827" variant="Bold" />
-            Sécurité du compte
-          </h2>
-        </div>
-
-        <div className="p-6">
-          {!isEditingPassword ? (
-            <button
-              onClick={() => setIsEditingPassword(true)}
-              className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl"
-            >
-              <Edit2 size={18} color="white" variant="Bold" />
-              <span>Modifier mon mot de passe</span>
-            </button>
-          ) : (
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              {/* Old Password */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Mot de passe actuel
-                </label>
-                <div className="relative">
-                  <input
-                    type={showOldPassword ? 'text' : 'password'}
-                    value={oldPassword}
-                    onChange={(e) => setOldPassword(e.target.value)}
-                    required
-                    className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                    placeholder="Entrez votre mot de passe actuel"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowOldPassword(!showOldPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                  >
-                    {showOldPassword ? (
-                      <EyeSlash size={20} color="#6B7280" />
-                    ) : (
-                      <Eye size={20} color="#6B7280" />
-                    )}
-                  </button>
+        {activeTab === 'notifications' && (
+          <div className="max-w-2xl">
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Notification size={24} color="#7C3AED" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Paramètres de notifications</h3>
+                  <p className="text-sm text-gray-500">Gérez vos préférences de notification</p>
                 </div>
               </div>
 
-              {/* New Password */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Nouveau mot de passe
-                </label>
-                <div className="relative">
-                  <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                    className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                    placeholder="Entrez votre nouveau mot de passe"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                  >
-                    {showNewPassword ? (
-                      <EyeSlash size={20} color="#6B7280" />
-                    ) : (
-                      <Eye size={20} color="#6B7280" />
-                    )}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Le mot de passe doit contenir au moins 6 caractères
-                </p>
-              </div>
-
-              {/* Confirm Password */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Confirmer le nouveau mot de passe
-                </label>
-                <div className="relative">
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                    placeholder="Confirmez votre nouveau mot de passe"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                  >
-                    {showConfirmPassword ? (
-                      <EyeSlash size={20} color="#6B7280" />
-                    ) : (
-                      <Eye size={20} color="#6B7280" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditingPassword(false);
-                    setOldPassword('');
-                    setNewPassword('');
-                    setConfirmPassword('');
-                  }}
-                  disabled={isSubmitting}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors disabled:opacity-50"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white rounded-lg font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <SpinLoader />
-                      <span>Modification...</span>
-                    </>
-                  ) : (
-                    <>
-                      <TickCircle size={18} color="white" variant="Bold" />
-                      <span>Modifier le mot de passe</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-
-      {/* Notification Settings Card */}
-      <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-purple-50 to-purple-100 px-6 py-4 border-b border-purple-200">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Notification size={20} color="#111827" variant="Bold" />
-            Paramètres de notifications
-          </h2>
-        </div>
-
-        <div className="p-6">
-          {!isEditingNotifications ? (
-            <div className="space-y-4">
-              {/* Current Settings Display */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Email Status */}
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-gray-700">Email</span>
-                    {email ? (
-                      <Verify size={18} color="#10B981" variant="Bold" />
-                    ) : (
-                      <CloseCircle size={18} color="#EF4444" variant="Bold" />
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-900">{email || 'Non configuré'}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Notifications: {emailNotifications ? 'Activées' : 'Désactivées'}
-                  </p>
-                </div>
-
-                {/* WhatsApp Status */}
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-gray-700">WhatsApp</span>
-                    {phone ? (
-                      <Verify size={18} color="#10B981" variant="Bold" />
-                    ) : (
-                      <CloseCircle size={18} color="#EF4444" variant="Bold" />
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-900">{phone || 'Non configuré'}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Notifications: {whatsappNotifications ? 'Activées' : 'Désactivées'}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setIsEditingNotifications(true)}
-                className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl"
-              >
-                <Edit2 size={18} color="white" variant="Bold" />
-                <span>Modifier mes paramètres de notifications</span>
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleNotificationSettingsSave} className="space-y-6">
-              {/* Email Section */}
-              <div className="space-y-3">
-                <label className="block text-sm font-semibold text-gray-700">
-                  Adresse Email
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="votre@email.com"
-                    className="w-full px-3 py-2.5 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  />
-                  <Sms
-                    size={20}
-                    color="#6B7280"
-                    className="absolute left-3 top-1/2 -translate-y-1/2"
-                  />
-                </div>
-
-                {/* Email Notifications Toggle */}
-                <label className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200 cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <Sms size={20} color="#3B82F6" variant="Bold" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        Recevoir les notifications par email
+              {!isEditingNotifications ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">Email</span>
+                        {email ? <Verify size={16} color="#10B981" /> : <CloseCircle size={16} color="#EF4444" />}
+                      </div>
+                      <p className="text-sm text-gray-900">{email || 'Non configuré'}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Notifications: {emailNotifications ? 'Activées' : 'Désactivées'}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        Recevez les notifications importantes par email
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">WhatsApp</span>
+                        {phone ? <Verify size={16} color="#10B981" /> : <CloseCircle size={16} color="#EF4444" />}
+                      </div>
+                      <p className="text-sm text-gray-900">{phone || 'Non configuré'}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Notifications: {whatsappNotifications ? 'Activées' : 'Désactivées'}
                       </p>
                     </div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={emailNotifications}
-                    onChange={(e) => setEmailNotifications(e.target.checked)}
-                    disabled={!email}
-                    className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                  />
-                </label>
-              </div>
-
-              {/* Phone Section */}
-              <div className="space-y-3">
-                <label className="block text-sm font-semibold text-gray-700">
-                  Numéro WhatsApp
-                </label>
-                <div className="relative">
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+33 6 12 34 56 78"
-                    className="w-full px-3 py-2.5 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  />
-                  <Mobile
-                    size={20}
-                    color="#6B7280"
-                    className="absolute left-3 top-1/2 -translate-y-1/2"
-                  />
+                  <button
+                    onClick={() => setIsEditingNotifications(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    <Edit2 size={18} color="white" />
+                    Modifier mes paramètres
+                  </button>
                 </div>
-
-                {/* WhatsApp Notifications Toggle */}
-                <label className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <Whatsapp size={20} color="#10B981" variant="Bold" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        Recevoir les notifications par WhatsApp
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Recevez les notifications importantes sur WhatsApp
-                      </p>
+              ) : (
+                <form onSubmit={handleNotificationsSave} className="space-y-6">
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Adresse Email
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="votre@email.com"
+                        className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                      <Sms size={18} color="#6B7280" className="absolute left-3 top-1/2 -translate-y-1/2" />
                     </div>
+                    <label className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200 cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <Sms size={20} color="#3B82F6" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Notifications par email</p>
+                          <p className="text-xs text-gray-500">Recevez les notifications importantes</p>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={emailNotifications}
+                        onChange={(e) => setEmailNotifications(e.target.checked)}
+                        disabled={!email}
+                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+                      />
+                    </label>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={whatsappNotifications}
-                    onChange={(e) => setWhatsappNotifications(e.target.checked)}
-                    disabled={!phone}
-                    className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 disabled:opacity-50"
-                  />
-                </label>
-              </div>
 
-              {/* Platform Notifications (Always enabled) */}
-              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex items-center gap-3">
-                  <Notification size={20} color="#6B7280" variant="Bold" />
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      Notifications sur la plateforme
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Toujours activées - Consultez le centre de notifications
-                    </p>
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Numéro WhatsApp
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+33 6 12 34 56 78"
+                        className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                      <Mobile size={18} color="#6B7280" className="absolute left-3 top-1/2 -translate-y-1/2" />
+                    </div>
+                    <label className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <Whatsapp size={20} color="#10B981" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Notifications WhatsApp</p>
+                          <p className="text-xs text-gray-500">Recevez les notifications sur WhatsApp</p>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={whatsappNotifications}
+                        onChange={(e) => setWhatsappNotifications(e.target.checked)}
+                        disabled={!phone}
+                        className="w-5 h-5 text-green-600 rounded focus:ring-green-500 disabled:opacity-50"
+                      />
+                    </label>
                   </div>
-                </div>
-              </div>
 
-              {/* Actions */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditingNotifications(false);
-                    // Reset to current user values
-                    setEmail(user?.email || '');
-                    setPhone(user?.phone || '');
-                    setEmailNotifications(user?.emailNotifications || false);
-                    setWhatsappNotifications(user?.whatsappNotifications || false);
-                  }}
-                  disabled={updatingUser}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors disabled:opacity-50"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={updatingUser}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg"
-                >
-                  {updatingUser ? (
-                    <>
-                      <SpinLoader />
-                      <span>Enregistrement...</span>
-                    </>
-                  ) : (
-                    <>
-                      <TickCircle size={18} color="white" variant="Bold" />
-                      <span>Enregistrer les paramètres</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingNotifications(false);
+                        setEmail(user?.email || '');
+                        setPhone(user?.phone || '');
+                        setEmailNotifications(user?.emailNotifications || false);
+                        setWhatsappNotifications(user?.whatsappNotifications || false);
+                      }}
+                      className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-gray-700"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={updatingUser}
+                      className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {updatingUser ? <SpinLoader /> : <TickCircle size={18} color="white" />}
+                      Enregistrer
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
